@@ -32,6 +32,12 @@ Generate a Cefalu family bundle:
 geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
 ```
 
+Generate Cefalu symmetry orbits:
+
+```bash
+geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 7 --out outputs/cefalu_orbits
+```
+
 ## Inspect outputs
 
 The bundle directory contains:
@@ -46,6 +52,7 @@ To validate an existing bundle:
 
 ```bash
 geocydata validate bundle --input outputs/demo
+geocydata validate symmetry --input outputs/cefalu_orbits
 ```
 
 If validation succeeds, the JSON report will end with `"passed": true`.

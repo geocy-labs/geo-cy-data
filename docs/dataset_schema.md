@@ -31,6 +31,20 @@ which is invariant under nonzero complex projective rescaling.
 
 Includes application metadata, generation parameters, artifact paths, schema version, and bundle naming fields such as `bundle_name` and `bundle_path`. For the Cefalu family, `parameters.lambda` stores the selected family value.
 
+## `orbits.parquet`
+
+Produced by `geocydata generate orbits` for `cefalu_quartic`.
+
+- `point_id`: base sampled point id
+- `action_id`: symmetry action label
+- `permutation`: JSON-encoded coordinate permutation
+- `signs`: JSON-encoded sign pattern
+- `canonical_key`: deterministic orbit representative label
+- `is_canonical`: whether this row is the chosen canonical representative
+- `orbit_size`: number of unique representatives recorded for the base point
+- `z{0..3}_re`, `z{0..3}_im`: phase-normalized representative coordinates
+- `family_lambda`: Cefalu family parameter
+
 ## `validation_report.json`
 
 Includes:
@@ -45,6 +59,19 @@ Includes:
 ## `summary.md`
 
 Human-readable overview of the bundle contents and validation results.
+
+## `symmetry_report.json`
+
+Produced by `geocydata generate orbits` and `geocydata validate symmetry`.
+
+Includes:
+
+- group size
+- orbit size statistics
+- residual preservation statistics under symmetry actions
+- canonicalization drift
+- canonical invariant drift
+- warnings and pass/fail summary
 
 ## Naming notes
 

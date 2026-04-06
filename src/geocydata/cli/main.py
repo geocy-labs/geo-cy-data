@@ -13,9 +13,15 @@ from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
 from geocydata.registry.geometries import GEOMETRIES, get_geometry, list_geometries
 from geocydata.sampling.point_sampler import generate_sample_batch
+from geocydata.symmetry.canonicalize import canonical_key_string
 from geocydata.utils.logging import configure_logging
 from geocydata.utils.paths import ensure_directory
 from geocydata.validation.reports import build_validation_report
+from geocydata.validation.symmetry_checks import (
+    build_canonical_invariants_dataframe,
+    build_orbits_dataframe,
+    build_symmetry_report,
+)
 
 app = typer.Typer(
     help=(
@@ -77,6 +83,53 @@ def _bundle_summary(
 ## Chart distribution
 
 - {chart_distribution}
+
+## Warnings
+
+{warning_text}
+
+## Artifacts
+
+{artifacts}
+"""
+
+
+def _orbit_summary(
+    *,
+    geometry_name: str,
+    parameters: dict[str, object],
+    n_points: int,
+    artifact_paths: dict[str, str],
+    report: dict[str, object],
+) -> str:
+    artifacts = "\n".join(f"- `{name}`: `{path}`" for name, path in artifact_paths.items())
+    parameter_lines = "\n".join(f"- {name}: `{value}`" for name, value in parameters.items()) or "- none"
+    warnings = report["warnings"] or ["none"]
+    warning_text = "\n".join(f"- {warning}" for warning in warnings)
+    return f"""# GeoCYData Orbit Summary
+
+## Geometry
+
+- name: `{geometry_name}`
+- points: `{n_points}`
+
+## Parameters
+
+{parameter_lines}
+
+## Orbit statistics
+
+- group size: `{report["group_size"]}`
+- min orbit size: `{report["orbit_size"]["min"]}`
+- max orbit size: `{report["orbit_size"]["max"]}`
+- mean orbit size: `{report["orbit_size"]["mean"]:.2f}`
+
+## Symmetry validation
+
+- max residual preservation delta: `{report["residual_preservation"]["max"]:.3e}`
+- max canonicalization drift: `{report["canonicalization_drift"]["max"]:.3e}`
+- max canonical invariant drift: `{report["canonical_invariant_drift"]["max"]:.3e}`
+- passed: `{report["passed"]}`
 
 ## Warnings
 
@@ -216,6 +269,100 @@ def generate_bundle(
     typer.echo("Artifacts: manifest.json, points.parquet, invariants.parquet, validation_report.json, summary.md")
 
 
+@generate_app.command("orbits")
+def generate_orbits(
+    geometry: str = typer.Option(
+        ...,
+        "--geometry",
+        help="Registered geometry name. Phase 3 orbit generation currently supports `cefalu_quartic`.",
+    ),
+    n: int = typer.Option(..., "--n", min=1, help="Number of base projective points to sample."),
+    seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility."),
+    lambda_value: float | None = typer.Option(
+        None,
+        "--lambda",
+        help="Required family parameter for `cefalu_quartic`.",
+    ),
+    out: Path = typer.Option(
+        ...,
+        "--out",
+        help="Output orbit bundle directory. It will be created if it does not exist.",
+    ),
+) -> None:
+    """Generate symmetry-orbit data for the Cefalu quartic family."""
+
+    if geometry != "cefalu_quartic":
+        typer.secho(
+            "Phase 3 orbit generation currently supports only 'cefalu_quartic'.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        resolved_geometry = get_geometry(geometry)
+        resolved_parameters = resolved_geometry.validate_parameters({"lambda": lambda_value})
+    except (KeyError, ValueError) as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    output_dir = ensure_directory(out)
+    batch = generate_sample_batch(
+        geometry_name=geometry,
+        n=n,
+        seed=seed,
+        parameters=resolved_parameters,
+    )
+    lambda_float = float(resolved_parameters["lambda"])
+    orbits_df = build_orbits_dataframe(batch.points, lambda_value=lambda_float)
+    canonical_invariants_df = build_canonical_invariants_dataframe(batch.points, lambda_value=lambda_float)
+    symmetry_report = build_symmetry_report(batch.points, lambda_value=lambda_float)
+
+    artifact_paths = {
+        "manifest": "manifest.json",
+        "points": "points.parquet",
+        "invariants": "invariants.parquet",
+        "orbits": "orbits.parquet",
+        "symmetry_report": "symmetry_report.json",
+        "summary": "summary.md",
+    }
+    write_parquet(batch.points_df, output_dir / artifact_paths["points"])
+    write_parquet(canonical_invariants_df, output_dir / artifact_paths["invariants"])
+    write_parquet(orbits_df, output_dir / artifact_paths["orbits"])
+    (output_dir / artifact_paths["symmetry_report"]).write_text(
+        json.dumps(symmetry_report, indent=2),
+        encoding="utf-8",
+    )
+    (output_dir / artifact_paths["summary"]).write_text(
+        _orbit_summary(
+            geometry_name=geometry,
+            parameters=resolved_parameters,
+            n_points=n,
+            artifact_paths=artifact_paths,
+            report=symmetry_report,
+        ),
+        encoding="utf-8",
+    )
+    manifest = build_manifest(
+        geometry=geometry,
+        n_points=n,
+        seed=seed,
+        output_dir=output_dir,
+        artifact_paths=artifact_paths,
+        parameters={
+            "geometry": geometry,
+            "geometry_description": resolved_geometry.description,
+            **resolved_parameters,
+            "n": n,
+            "seed": seed,
+            "orbit_mode": True,
+        },
+    )
+    write_manifest(manifest, output_dir / artifact_paths["manifest"])
+    typer.echo(f"GeoCYData orbit bundle written to {output_dir}")
+    typer.echo("Artifacts: manifest.json, points.parquet, invariants.parquet, orbits.parquet, symmetry_report.json, summary.md")
+
+
 @validate_app.command("bundle")
 def validate_bundle(
     input: Path = typer.Option(
@@ -283,6 +430,59 @@ def validate_bundle(
         n_points=len(points_df),
         seed=None,
     )
+    typer.echo(json.dumps(report, indent=2))
+
+
+@validate_app.command("symmetry")
+def validate_symmetry(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        exists=True,
+        file_okay=False,
+        help="Path to an existing GeoCYData orbit bundle directory.",
+    )
+) -> None:
+    """Validate a symmetry-orbit bundle for the Cefalu quartic family."""
+
+    points_path = input / "points.parquet"
+    orbits_path = input / "orbits.parquet"
+    manifest_path = input / "manifest.json"
+    for required_path in (points_path, orbits_path, manifest_path):
+        if not required_path.exists():
+            typer.secho(
+                f"Orbit bundle is missing required file: {required_path.name}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
+    try:
+        points_df = pd.read_parquet(points_path)
+        pd.read_parquet(orbits_path)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        typer.secho(f"Could not read orbit bundle: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    parameters = dict(manifest.get("parameters", {}))
+    geometry_name = str(manifest.get("geometry", ""))
+    if geometry_name != "cefalu_quartic":
+        typer.secho(
+            "Symmetry validation currently supports only 'cefalu_quartic' orbit bundles.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if parameters.get("lambda") is None:
+        typer.secho("Orbit bundle manifest is missing the Cefalu 'lambda' parameter.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    coords = []
+    for idx in range(4):
+        coords.append(points_df[f"z{idx}_re"].to_numpy() + 1j * points_df[f"z{idx}_im"].to_numpy())
+    points = np.column_stack(coords)
+    report = build_symmetry_report(points, lambda_value=float(parameters["lambda"]))
     typer.echo(json.dumps(report, indent=2))
 
 
