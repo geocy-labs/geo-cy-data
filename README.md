@@ -12,7 +12,7 @@ Research workflows around Calabi-Yau benchmark data often start as one-off scrip
 - Parameterized bundle generation for the Cefalu quartic family in `P^3`
 - Symmetry-orbit generation and canonical representatives for the Cefalu quartic family
 - Lightweight experiment runner for local-vs-global representation comparison
-- Geometry-derived experiment targets, including a hypersurface-aware Fubini-Study scalar proxy
+- Geometry-derived experiment targets, with `hypersurface_fs_scalar` as the preferred hypersurface-aware benchmark target
 - Standardized benchmark sweeps and publication-facing release packaging with per-seed, aggregated, and robustness markdown/JSON result summaries
 - Versioned release validation and regeneration workflow for external reproducibility
 - Paper-facing asset generation from frozen release outputs, including manuscript notes, tables, and simple figures
@@ -86,16 +86,22 @@ geocydata validate bundle --input outputs/demo
 geocydata validate symmetry --input outputs/cefalu_orbits
 ```
 
-Run the first experiment scaffold:
+Run the benchmark experiment scaffold:
 
 ```bash
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target fs_scalar --out runs/local_cep1
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target fs_scalar --out runs/global_cep1
 geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target hypersurface_fs_scalar --out runs/local_hfs
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target hypersurface_fs_scalar --out runs/global_hfs
 geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target hypersurface_fs_scalar --out runs/compare_hfs
 geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
 geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
 geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
+```
+
+Legacy compatibility target examples remain available if you need to reproduce the earlier ambient proxy workflow:
+
+```bash
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target fs_scalar --out runs/local_fs_legacy
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target fs_scalar --out runs/global_fs_legacy
 ```
 
 ## Supported geometries
