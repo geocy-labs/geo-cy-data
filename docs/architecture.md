@@ -26,3 +26,8 @@ Phase 4 adds a lightweight experiment layer:
 - `geocydata.experiments.models`: small sklearn baselines used for both views
 - `geocydata.experiments.runner`: reproducible train/validation splits, artifact writing, and comparison runs
 
+Phase 5 extends that layer with geometry-derived targets:
+
+- `geocydata.baselines.fubini_study`: ambient Fubini-Study scalar proxy from affine chart coordinates
+- target selection in the experiment runner so the preferred geometry-derived target and the older convenience target can both be reproduced explicitly
+

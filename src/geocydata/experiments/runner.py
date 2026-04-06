@@ -10,7 +10,12 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-from geocydata.experiments.data import BundleDataset, load_bundle_dataset, prepare_experiment_matrix
+from geocydata.experiments.data import (
+    BundleDataset,
+    TARGET_LABELS,
+    load_bundle_dataset,
+    prepare_experiment_matrix,
+)
 from geocydata.experiments.models import MODEL_LABELS, build_regressor
 from geocydata.utils.paths import ensure_directory
 
@@ -23,6 +28,7 @@ def _summary_markdown(config: dict[str, object], metrics: dict[str, object]) -> 
 - model: `{config["model"]}`
 - bundle: `{config["bundle"]}`
 - target: `{metrics["target_name"]}`
+- target description: `{metrics["target_description"]}`
 - geometry: `{metrics["geometry"]}`
 - lambda: `{metrics["lambda"]}`
 
@@ -37,6 +43,8 @@ def _summary_markdown(config: dict[str, object], metrics: dict[str, object]) -> 
 - runtime seconds: `{metrics["runtime_seconds"]:.3f}`
 - samples: `{metrics["n_samples"]}`
 - feature dimension: `{metrics["feature_dim"]}`
+- train samples: `{metrics["train_samples"]}`
+- validation samples: `{metrics["validation_samples"]}`
 """
 
 
@@ -56,10 +64,13 @@ def _comparison_markdown(comparison: dict[str, object]) -> str:
 
 - local score: `{local_metrics["validation_score"]:.6f}`
 - global score: `{global_metrics["validation_score"]:.6f}`
+- validation score delta (global - local): `{comparison["metric_deltas"]["validation_score"]:.6f}`
 - local mse: `{local_metrics["validation_mse"]:.6e}`
 - global mse: `{global_metrics["validation_mse"]:.6e}`
+- validation mse delta (global - local): `{comparison["metric_deltas"]["validation_mse"]:.6e}`
 - local mae: `{local_metrics["validation_mae"]:.6e}`
 - global mae: `{global_metrics["validation_mae"]:.6e}`
+- validation mae delta (global - local): `{comparison["metric_deltas"]["validation_mae"]:.6e}`
 """
 
 
@@ -70,6 +81,8 @@ def _metrics_dict(
     feature_dim: int,
     n_samples: int,
     runtime_seconds: float,
+    train_samples: int,
+    validation_samples: int,
     y_train,
     y_val,
     train_pred,
@@ -81,9 +94,12 @@ def _metrics_dict(
         "geometry": dataset.manifest.get("geometry"),
         "lambda": parameters.get("lambda"),
         "target_name": target_name,
+        "target_description": TARGET_LABELS[target_name],
         "n_samples": n_samples,
         "feature_dim": feature_dim,
         "runtime_seconds": runtime_seconds,
+        "train_samples": train_samples,
+        "validation_samples": validation_samples,
         "train_score": float(r2_score(y_train, train_pred)),
         "validation_score": float(r2_score(y_val, val_pred)),
         "train_mse": float(mean_squared_error(y_train, train_pred)),
@@ -98,6 +114,7 @@ def run_experiment(
     *,
     bundle_dir: str | Path,
     model_name: str,
+    target_name: str,
     out_dir: str | Path,
     seed: int = 7,
     test_size: float = 0.2,
@@ -105,7 +122,7 @@ def run_experiment(
     """Run one experiment and write reproducible artifacts."""
 
     dataset = load_bundle_dataset(bundle_dir)
-    matrix = prepare_experiment_matrix(dataset, model_name=model_name)
+    matrix = prepare_experiment_matrix(dataset, model_name=model_name, target_name=target_name)
     output_dir = ensure_directory(out_dir)
     config = {
         "bundle": str(Path(bundle_dir)),
@@ -114,6 +131,7 @@ def run_experiment(
         "seed": seed,
         "test_size": test_size,
         "target_name": matrix.target_name,
+        "target_description": TARGET_LABELS[matrix.target_name],
     }
 
     start = time.perf_counter()
@@ -138,6 +156,8 @@ def run_experiment(
         feature_dim=matrix.X.shape[1],
         n_samples=matrix.X.shape[0],
         runtime_seconds=runtime_seconds,
+        train_samples=len(idx_train),
+        validation_samples=len(idx_val),
         y_train=y_train,
         y_val=y_val,
         train_pred=train_pred,
@@ -165,6 +185,7 @@ def compare_experiments(
     *,
     bundle_dir: str | Path,
     out_dir: str | Path,
+    target_name: str,
     seed: int = 7,
     test_size: float = 0.2,
 ) -> dict[str, object]:
@@ -174,6 +195,7 @@ def compare_experiments(
     local_metrics = run_experiment(
         bundle_dir=bundle_dir,
         model_name="local",
+        target_name=target_name,
         out_dir=output_dir / "local",
         seed=seed,
         test_size=test_size,
@@ -181,6 +203,7 @@ def compare_experiments(
     global_metrics = run_experiment(
         bundle_dir=bundle_dir,
         model_name="global",
+        target_name=target_name,
         out_dir=output_dir / "global",
         seed=seed,
         test_size=test_size,
@@ -191,8 +214,14 @@ def compare_experiments(
         "geometry": dataset.manifest.get("geometry"),
         "lambda": dict(dataset.manifest.get("parameters", {})).get("lambda"),
         "target_name": local_metrics["target_name"],
+        "target_description": local_metrics["target_description"],
         "local": local_metrics,
         "global": global_metrics,
+        "metric_deltas": {
+            "validation_score": global_metrics["validation_score"] - local_metrics["validation_score"],
+            "validation_mse": global_metrics["validation_mse"] - local_metrics["validation_mse"],
+            "validation_mae": global_metrics["validation_mae"] - local_metrics["validation_mae"],
+        },
     }
     (output_dir / "comparison.json").write_text(json.dumps(comparison, indent=2), encoding="utf-8")
     (output_dir / "comparison.md").write_text(_comparison_markdown(comparison), encoding="utf-8")

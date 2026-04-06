@@ -78,16 +78,24 @@ Includes:
 Produced by `geocydata experiments run`.
 
 - `config.json`: run configuration including bundle path, model mode, seed, and split fraction
-- `metrics.json`: train/validation scores, error metrics, run time, feature dimension, and geometry metadata
+- `metrics.json`: train/validation scores, error metrics, run time, feature dimension, geometry metadata, target name, and split sizes
 - `predictions.parquet`: point ids, split labels, ground-truth target values, and predictions
 - `summary.md`: short markdown summary of the run
+
+Preferred target in Phase 5:
+
+- `fs_scalar`: an ambient Fubini-Study determinant proxy computed from affine chart coordinates
+
+Compatibility target:
+
+- `invariant_weighted_sum`: the older Phase 4 convenience/debug target derived directly from invariant-table features
 
 ## Experiment comparison artifacts
 
 Produced by `geocydata experiments compare`.
 
 - `local/` and `global/`: per-model run artifacts
-- `comparison.json`: side-by-side summary of local and global metrics
+- `comparison.json`: side-by-side summary of local and global metrics, including metric deltas and the target used
 - `comparison.md`: short markdown comparison report
 
 ## Naming notes

@@ -68,11 +68,13 @@ geocydata validate symmetry --input outputs/cefalu_orbits
 ## Run one experiment
 
 ```bash
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --out runs/local_cep1
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --out runs/global_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target fs_scalar --out runs/local_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target fs_scalar --out runs/global_cep1
 ```
 
-This command loads `points.parquet` and `invariants.parquet`, constructs a deterministic scalar target from the invariant table, splits the bundle reproducibly, and writes run artifacts:
+The preferred target is `fs_scalar`, an ambient Fubini-Study determinant proxy computed from the affine chart coordinates. The older `invariant_weighted_sum` target remains available as a convenience/debug option.
+
+This command loads `points.parquet` and `invariants.parquet`, constructs the selected target, splits the bundle reproducibly, and writes run artifacts:
 
 - `config.json`
 - `metrics.json`
@@ -82,7 +84,7 @@ This command loads `points.parquet` and `invariants.parquet`, constructs a deter
 ## Compare local and global models
 
 ```bash
-geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --out runs/compare_cep1
+geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target fs_scalar --out runs/compare_cep1
 ```
 
 This command runs both model modes on the same bundle and writes:
