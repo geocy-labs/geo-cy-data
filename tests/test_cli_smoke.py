@@ -118,6 +118,8 @@ def test_cli_experiment_compare_smoke(tmp_path: Path) -> None:
             "compare",
             "--bundle",
             str(bundle_dir),
+            "--target",
+            "fs_scalar",
             "--out",
             str(compare_dir),
         ],

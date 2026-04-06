@@ -502,6 +502,11 @@ def run() -> None:
 def experiments_run(
     bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
     model: str = typer.Option(..., "--model", help="Experiment model: `local` or `global`."),
+    target: str = typer.Option(
+        "fs_scalar",
+        "--target",
+        help="Experiment target: `fs_scalar` (preferred) or `invariant_weighted_sum` (debug/convenience).",
+    ),
     out: Path = typer.Option(..., "--out", help="Output run directory."),
     seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
     test_size: float = typer.Option(0.2, "--test-size", min=0.05, max=0.5, help="Validation fraction."),
@@ -515,6 +520,7 @@ def experiments_run(
         metrics = run_experiment(
             bundle_dir=bundle,
             model_name=model,
+            target_name=target,
             out_dir=out,
             seed=seed,
             test_size=test_size,
@@ -532,6 +538,11 @@ def experiments_run(
 @experiments_app.command("compare")
 def experiments_compare(
     bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
+    target: str = typer.Option(
+        "fs_scalar",
+        "--target",
+        help="Experiment target: `fs_scalar` (preferred) or `invariant_weighted_sum` (debug/convenience).",
+    ),
     out: Path = typer.Option(..., "--out", help="Output comparison directory."),
     seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
     test_size: float = typer.Option(0.2, "--test-size", min=0.05, max=0.5, help="Validation fraction."),
@@ -542,6 +553,7 @@ def experiments_compare(
         comparison = compare_experiments(
             bundle_dir=bundle,
             out_dir=out,
+            target_name=target,
             seed=seed,
             test_size=test_size,
         )

@@ -9,6 +9,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from geocydata.baselines.fubini_study import fubini_study_scalar
+
+
+TARGET_LABELS = {
+    "fs_scalar": "Ambient Fubini-Study determinant proxy from affine chart coordinates.",
+    "invariant_weighted_sum": "Convenience/debug target from a weighted sum of invariant features.",
+}
 
 @dataclass(frozen=True)
 class BundleDataset:
@@ -69,6 +76,12 @@ def target_from_invariants(invariants_df: pd.DataFrame) -> tuple[np.ndarray, str
     return target.astype(np.float64), "invariant_weighted_sum"
 
 
+def geometry_target_from_points(points_df: pd.DataFrame) -> tuple[np.ndarray, str]:
+    """Build the preferred geometry-derived scalar target from affine chart coordinates."""
+
+    return fubini_study_scalar(points_df).astype(np.float64), "fs_scalar"
+
+
 def local_feature_matrix(points_df: pd.DataFrame) -> tuple[np.ndarray, list[str]]:
     """Build local affine-coordinate features with one-hot chart indicators."""
 
@@ -98,10 +111,25 @@ def global_feature_matrix(invariants_df: pd.DataFrame) -> tuple[np.ndarray, list
     return invariants_df[feature_columns].to_numpy(dtype=np.float64), feature_columns
 
 
-def prepare_experiment_matrix(dataset: BundleDataset, model_name: str) -> ExperimentMatrix:
-    """Prepare features and target arrays for the chosen model family."""
+def build_target(dataset: BundleDataset, target_name: str) -> tuple[np.ndarray, str]:
+    """Build a supervised target array for the selected experiment target."""
 
-    y, target_name = target_from_invariants(dataset.invariants_df)
+    if target_name == "fs_scalar":
+        return geometry_target_from_points(dataset.points_df)
+    if target_name == "invariant_weighted_sum":
+        return target_from_invariants(dataset.invariants_df)
+    raise ValueError(f"Unsupported experiment target '{target_name}'.")
+
+
+def prepare_experiment_matrix(
+    dataset: BundleDataset,
+    model_name: str,
+    *,
+    target_name: str,
+) -> ExperimentMatrix:
+    """Prepare features and target arrays for the chosen model family and target."""
+
+    y, resolved_target_name = build_target(dataset, target_name)
     if model_name == "local":
         X, feature_names = local_feature_matrix(dataset.points_df)
     elif model_name == "global":
@@ -115,5 +143,5 @@ def prepare_experiment_matrix(dataset: BundleDataset, model_name: str) -> Experi
         y=y,
         point_ids=point_ids,
         feature_names=feature_names,
-        target_name=target_name,
+        target_name=resolved_target_name,
     )
