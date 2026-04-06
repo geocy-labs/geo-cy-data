@@ -20,3 +20,9 @@ Phase 3 adds a small symmetry layer for the Cefalu family:
 - `geocydata.symmetry.canonicalize`: deterministic canonical representatives
 - `geocydata.validation.symmetry_checks`: orbit export tables and symmetry consistency reports
 
+Phase 4 adds a lightweight experiment layer:
+
+- `geocydata.experiments.data`: bundle loading plus local/global feature preparation
+- `geocydata.experiments.models`: small sklearn baselines used for both views
+- `geocydata.experiments.runner`: reproducible train/validation splits, artifact writing, and comparison runs
+

@@ -38,6 +38,14 @@ Generate Cefalu symmetry orbits:
 geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 7 --out outputs/cefalu_orbits
 ```
 
+Run the first experiment scaffold:
+
+```bash
+geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model local --out runs/local_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model global --out runs/global_cep1
+geocydata experiments compare --bundle outputs/cefalu_lambda_0_75 --out runs/compare_cep1
+```
+
 ## Inspect outputs
 
 The bundle directory contains:
