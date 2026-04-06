@@ -9,13 +9,31 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from geocydata.baselines.fubini_study import fubini_study_scalar
+from geocydata.baselines.fubini_study import fubini_study_scalar, hypersurface_fubini_study_scalar
 
 
-TARGET_LABELS = {
-    "fs_scalar": "Ambient Fubini-Study determinant proxy from affine chart coordinates.",
-    "invariant_weighted_sum": "Convenience/debug target from a weighted sum of invariant features.",
+TARGET_METADATA = {
+    "hypersurface_fs_scalar": {
+        "description": (
+            "Tangent-restricted Fubini-Study scalar proxy using the local hypersurface gradient. "
+            "Preferred current benchmark target."
+        ),
+        "status": "preferred",
+        "kind": "hypersurface-aware",
+    },
+    "fs_scalar": {
+        "description": "Ambient Fubini-Study determinant proxy from affine chart coordinates. Legacy proxy target.",
+        "status": "legacy_proxy",
+        "kind": "ambient-proxy",
+    },
+    "invariant_weighted_sum": {
+        "description": "Convenience/debug target from a weighted sum of invariant features.",
+        "status": "debug",
+        "kind": "invariant-debug",
+    },
 }
+TARGET_LABELS = {name: payload["description"] for name, payload in TARGET_METADATA.items()}
+
 
 @dataclass(frozen=True)
 class BundleDataset:
@@ -77,9 +95,22 @@ def target_from_invariants(invariants_df: pd.DataFrame) -> tuple[np.ndarray, str
 
 
 def geometry_target_from_points(points_df: pd.DataFrame) -> tuple[np.ndarray, str]:
-    """Build the preferred geometry-derived scalar target from affine chart coordinates."""
+    """Build the older ambient-geometry scalar target from affine chart coordinates."""
 
     return fubini_study_scalar(points_df).astype(np.float64), "fs_scalar"
+
+
+def hypersurface_geometry_target(dataset: BundleDataset) -> tuple[np.ndarray, str]:
+    """Build the preferred hypersurface-aware scalar target from local chart data."""
+
+    parameters = dict(dataset.manifest.get("parameters", {}))
+    geometry_name = str(dataset.manifest.get("geometry", ""))
+    target = hypersurface_fubini_study_scalar(
+        dataset.points_df,
+        geometry_name=geometry_name,
+        parameters=parameters,
+    )
+    return target.astype(np.float64), "hypersurface_fs_scalar"
 
 
 def local_feature_matrix(points_df: pd.DataFrame) -> tuple[np.ndarray, list[str]]:
@@ -114,6 +145,8 @@ def global_feature_matrix(invariants_df: pd.DataFrame) -> tuple[np.ndarray, list
 def build_target(dataset: BundleDataset, target_name: str) -> tuple[np.ndarray, str]:
     """Build a supervised target array for the selected experiment target."""
 
+    if target_name == "hypersurface_fs_scalar":
+        return hypersurface_geometry_target(dataset)
     if target_name == "fs_scalar":
         return geometry_target_from_points(dataset.points_df)
     if target_name == "invariant_weighted_sum":

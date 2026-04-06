@@ -1,0 +1,7 @@
+case_label,geometry,lambda,model,validation_score_mean,validation_score_std,validation_mse_mean,run_count
+Cefalu quartic (lambda=0.75),cefalu_quartic,0.75,local,-0.1204681731276433,0.0745849887419469,0.002371968963532,3
+Cefalu quartic (lambda=0.75),cefalu_quartic,0.75,global,0.2890022232800889,0.2381514175305443,0.0013842311478497,3
+Cefalu quartic (lambda=1.0),cefalu_quartic,1.0,local,-0.1215711495705669,0.0775751237756684,0.002491997525998,3
+Cefalu quartic (lambda=1.0),cefalu_quartic,1.0,global,0.1065848633149216,0.2818072708045301,0.0018214284259113,3
+Fermat quartic,fermat_quartic,,local,-0.1693522874838591,0.0657335027632719,0.0030599300253549,3
+Fermat quartic,fermat_quartic,,global,0.5892373335247528,0.0604794792148438,0.0010842065420405,3

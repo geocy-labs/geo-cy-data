@@ -10,6 +10,11 @@ import pandas as pd
 import typer
 
 from geocydata.experiments.runner import compare_experiments, run_experiment
+from geocydata.experiments.paper_assets import build_paper_assets
+from geocydata.experiments.release import create_benchmark_release
+from geocydata.experiments.sweep import sweep_experiments
+from geocydata.experiments.validate_release import validate_benchmark_release
+from geocydata.experiments.validate_paper_assets import validate_paper_assets
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
 from geocydata.registry.geometries import GEOMETRIES, get_geometry, list_geometries
@@ -503,9 +508,12 @@ def experiments_run(
     bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
     model: str = typer.Option(..., "--model", help="Experiment model: `local` or `global`."),
     target: str = typer.Option(
-        "fs_scalar",
+        "hypersurface_fs_scalar",
         "--target",
-        help="Experiment target: `fs_scalar` (preferred) or `invariant_weighted_sum` (debug/convenience).",
+        help=(
+            "Experiment target: `hypersurface_fs_scalar` (preferred current benchmark target), "
+            "`fs_scalar` (legacy ambient proxy), or `invariant_weighted_sum` (debug/convenience)."
+        ),
     ),
     out: Path = typer.Option(..., "--out", help="Output run directory."),
     seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
@@ -539,9 +547,12 @@ def experiments_run(
 def experiments_compare(
     bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
     target: str = typer.Option(
-        "fs_scalar",
+        "hypersurface_fs_scalar",
         "--target",
-        help="Experiment target: `fs_scalar` (preferred) or `invariant_weighted_sum` (debug/convenience).",
+        help=(
+            "Experiment target: `hypersurface_fs_scalar` (preferred current benchmark target), "
+            "`fs_scalar` (legacy ambient proxy), or `invariant_weighted_sum` (debug/convenience)."
+        ),
     ),
     out: Path = typer.Option(..., "--out", help="Output comparison directory."),
     seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
@@ -565,3 +576,218 @@ def experiments_compare(
         f"Local val score: {comparison['local']['validation_score']:.6f}, "
         f"Global val score: {comparison['global']['validation_score']:.6f}"
     )
+
+
+@experiments_app.command("sweep", context_settings={"allow_extra_args": True, "ignore_unknown_options": False})
+def experiments_sweep(
+    ctx: typer.Context,
+    out: Path = typer.Option(..., "--out", help="Output benchmark directory."),
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        help="Optional named sweep preset, for example `paper_v1_default` or `paper_v1_multiseed`.",
+    ),
+    target: str | None = typer.Option(
+        None,
+        "--target",
+        help=(
+            "Experiment target used across the sweep. If omitted, the selected preset decides it; "
+            "otherwise `hypersurface_fs_scalar` remains the preferred current benchmark target."
+        ),
+    ),
+    seed: list[int] | None = typer.Option(
+        None,
+        "--seed",
+        help=(
+            "Deterministic sweep seed. Repeat the option to run multiple seeds, "
+            "for example `--seed 7 --seed 11`."
+        ),
+    ),
+    seeds: str | None = typer.Option(
+        None,
+        "--seeds",
+        help="Provide multiple seeds after one flag, for example `--seeds 7 11 19`.",
+    ),
+    n: int = typer.Option(200, "--n", min=16, help="Number of samples per benchmark bundle."),
+    include: list[str] | None = typer.Option(
+        None,
+        "--include",
+        help=(
+            "Restrict the benchmark cases. Repeat the option with case ids such as "
+            "`fermat_quartic`, `cefalu_lambda_0_75`, or `cefalu_lambda_1_0`."
+        ),
+    ),
+    test_size: float = typer.Option(0.2, "--test-size", min=0.05, max=0.5, help="Validation fraction."),
+) -> None:
+    """Run the standardized benchmark sweep and aggregate results into one report directory."""
+
+    try:
+        resolved_seeds = []
+        if seed:
+            resolved_seeds.extend(seed)
+        if seeds:
+            resolved_seeds.append(int(seeds))
+            for extra_arg in ctx.args:
+                if extra_arg.startswith("-"):
+                    break
+                resolved_seeds.append(int(extra_arg))
+        sweep = sweep_experiments(
+            out_dir=out,
+            target_name=target,
+            seeds=resolved_seeds or None,
+            n=n,
+            include=include,
+            test_size=test_size,
+            preset_name=preset,
+        )
+    except Exception as exc:
+        typer.secho(f"Benchmark sweep failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    case_ids = ", ".join(case["case_id"] for case in sweep["manifest"]["cases"])
+    typer.echo(f"Benchmark sweep written to {out}")
+    if preset:
+        typer.echo(f"Preset: {preset}")
+    typer.echo(f"Cases: {case_ids}")
+    typer.echo(
+        f"Recorded {sweep['manifest']['n_results']} results across seeds "
+        f"{', '.join(str(value) for value in sweep['manifest']['seeds'])}"
+    )
+    typer.echo(f"Aggregated rows: {len(sweep['aggregated_results'])}")
+    typer.echo(f"Robustness rows: {len(sweep['robustness'])}")
+
+
+@experiments_app.command("release")
+def experiments_release(
+    preset: str = typer.Option(..., "--preset", help="Named release preset, for example `paper_v1_default`."),
+    out: Path = typer.Option(..., "--out", help="Output release directory."),
+    include_hard_slice: bool = typer.Option(
+        False,
+        "--include-hard-slice",
+        help="Include the optional harder evaluation slice in the release.",
+    ),
+    hard_slice: str = typer.Option(
+        "cefalu_hard_v1",
+        "--hard-slice",
+        help="Named harder evaluation slice to include when `--include-hard-slice` is set.",
+    ),
+) -> None:
+    """Materialize a publication-facing benchmark release from a frozen protocol preset."""
+
+    try:
+        release = create_benchmark_release(
+            out_dir=out,
+            preset_name=preset,
+            include_hard_slice=include_hard_slice,
+            hard_slice_name=hard_slice,
+        )
+    except Exception as exc:
+        typer.secho(f"Benchmark release failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Benchmark release written to {out}")
+    typer.echo(f"Preset: {preset}")
+    if include_hard_slice:
+        typer.echo(f"Hard slice: {hard_slice}")
+    typer.echo("Artifacts: release_manifest.json, release_protocol.json, final_results.csv, final_robustness.csv, final_summary.md, results_memo.md")
+
+
+@experiments_app.command("regenerate-release")
+def experiments_regenerate_release(
+    preset: str = typer.Option(..., "--preset", help="Named release preset, for example `paper_v1_default`."),
+    out: Path = typer.Option(..., "--out", help="Output regenerated release directory."),
+    include_hard_slice: bool = typer.Option(
+        False,
+        "--include-hard-slice",
+        help="Include the optional harder evaluation slice in the regenerated release.",
+    ),
+    hard_slice: str = typer.Option(
+        "cefalu_hard_v1",
+        "--hard-slice",
+        help="Named harder evaluation slice to include when `--include-hard-slice` is set.",
+    ),
+) -> None:
+    """Regenerate a publication-facing benchmark release from the same frozen preset workflow."""
+
+    try:
+        create_benchmark_release(
+            out_dir=out,
+            preset_name=preset,
+            include_hard_slice=include_hard_slice,
+            hard_slice_name=hard_slice,
+        )
+    except Exception as exc:
+        typer.secho(f"Benchmark release regeneration failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Benchmark release regenerated at {out}")
+    typer.echo(f"Preset: {preset}")
+
+
+@experiments_app.command("validate-release")
+def experiments_validate_release(
+    input: Path = typer.Option(..., "--input", exists=True, file_okay=False, help="Input release directory."),
+) -> None:
+    """Validate a publication-facing benchmark release directory."""
+
+    try:
+        report = validate_benchmark_release(input)
+    except Exception as exc:
+        typer.secho(f"Release validation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Release validation written to {input}")
+    typer.echo(f"Passed: {report['passed']}")
+    if not report["passed"]:
+        raise typer.Exit(code=1)
+
+
+@experiments_app.command("build-paper-assets")
+def experiments_build_paper_assets(
+    input: Path = typer.Option(..., "--input", help="Input validated release directory."),
+    out: Path = typer.Option(
+        Path("paper"),
+        "--out",
+        help="Output paper scaffold directory. Defaults to `paper/`.",
+    ),
+) -> None:
+    """Build manuscript-facing tables, figures, and notes from frozen release outputs."""
+
+    if not input.is_dir():
+        typer.secho(f"Release directory does not exist: {input}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    try:
+        paper_assets = build_paper_assets(input_dir=input, out_dir=out)
+    except Exception as exc:
+        typer.secho(f"Paper asset build failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Paper assets written to {paper_assets['out_dir']}")
+    typer.echo("Artifacts: paper markdown scaffold, core_results_table.*, robustness_table.*, fig_core_scores.png, fig_hardest_case.png")
+
+
+@experiments_app.command("validate-paper-assets")
+def experiments_validate_paper_assets(
+    release: Path = typer.Option(..., "--release", help="Input frozen release directory."),
+    paper: Path = typer.Option(..., "--paper", help="Input paper scaffold directory."),
+) -> None:
+    """Validate that paper-facing assets remain consistent with a frozen release."""
+
+    if not release.is_dir():
+        typer.secho(f"Release directory does not exist: {release}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+    if not paper.is_dir():
+        typer.secho(f"Paper directory does not exist: {paper}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
+    try:
+        report = validate_paper_assets(release_dir=release, paper_dir=paper)
+    except Exception as exc:
+        typer.secho(f"Paper asset validation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Paper asset validation written to {paper}")
+    typer.echo(f"Passed: {report['passed']}")
+    if not report["passed"]:
+        raise typer.Exit(code=1)

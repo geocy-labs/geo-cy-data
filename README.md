@@ -12,7 +12,11 @@ Research workflows around Calabi-Yau benchmark data often start as one-off scrip
 - Parameterized bundle generation for the Cefalu quartic family in `P^3`
 - Symmetry-orbit generation and canonical representatives for the Cefalu quartic family
 - Lightweight experiment runner for local-vs-global representation comparison
-- Geometry-derived experiment targets, including a Fubini-Study scalar proxy
+- Geometry-derived experiment targets, including a hypersurface-aware Fubini-Study scalar proxy
+- Standardized benchmark sweeps and publication-facing release packaging with per-seed, aggregated, and robustness markdown/JSON result summaries
+- Versioned release validation and regeneration workflow for external reproducibility
+- Paper-facing asset generation from frozen release outputs, including manuscript notes, tables, and simple figures
+- Release-to-paper consistency validation for manuscript-facing assets
 - Simple branch-based sampler for complex homogeneous points on the hypersurface
 - Affine chart extraction and projective invariant feature generation
 - Bundle-level validation with residual and invariance drift reporting
@@ -52,7 +56,14 @@ Parameterized Cefalu examples:
 geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
 geocydata generate bundle --geometry cefalu_quartic --lambda 1.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_1_0
 geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 7 --out outputs/cefalu_orbits
-geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target fs_scalar --out runs/compare_cep1
+geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target hypersurface_fs_scalar --out runs/compare_hfs
+geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
+geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
+geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
+geocydata experiments validate-release --input releases/paper_v1_release
+geocydata experiments build-paper-assets --input releases/paper_v1_release --out paper
+geocydata experiments validate-paper-assets --release releases/paper_v1_release --paper paper
 ```
 
 ## Expected output bundle
@@ -80,6 +91,11 @@ Run the first experiment scaffold:
 ```bash
 geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target fs_scalar --out runs/local_cep1
 geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target fs_scalar --out runs/global_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target hypersurface_fs_scalar --out runs/local_hfs
+geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target hypersurface_fs_scalar --out runs/compare_hfs
+geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
+geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
 ```
 
 ## Supported geometries
@@ -95,11 +111,51 @@ geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --ta
 - [CLI reference](docs/cli_reference.md)
 - [Development guide](docs/development.md)
 
+## Paper assets
+
+Frozen benchmark releases are the source of truth for manuscript-facing assets. Build the paper scaffold, tables, and figures from a validated release with:
+
+```bash
+geocydata experiments build-paper-assets --input releases/paper_v1_release --out paper
+```
+
+This writes:
+
+- `paper/outline.md`
+- `paper/abstract_draft.md`
+- `paper/introduction_notes.md`
+- `paper/methods_notes.md`
+- `paper/results_notes.md`
+- `paper/reproducibility_notes.md`
+- `paper/assets/core_results_table.csv`
+- `paper/assets/core_results_table.md`
+- `paper/assets/robustness_table.csv`
+- `paper/assets/robustness_table.md`
+- `paper/assets/fig_core_scores.png`
+- `paper/assets/fig_hardest_case.png`
+
+Validate that the paper layer still matches the frozen release:
+
+```bash
+geocydata experiments validate-paper-assets --release releases/paper_v1_release --paper paper
+```
+
+This writes:
+
+- `paper/paper_validation_report.json`
+- `paper/paper_validation_summary.md`
+
 ## Current limitations
 
 - The current samplers are documented branch-based smoke-test methods, not uniform samplers over the hypersurfaces
 - Symmetry orbits currently target `cefalu_quartic` only
-- The preferred experiment target is an ambient Fubini-Study scalar proxy from affine chart coordinates; it is more geometry-derived than the Phase 4 convenience target, but still not Ricci-flat metric learning
+- The preferred experiment target is `hypersurface_fs_scalar`, a tangent-restricted Fubini-Study proxy that uses the local hypersurface gradient; it is stronger than the older ambient `fs_scalar`, but still not Ricci-flat metric learning
+- The Phase 6 sweep standardizes first benchmark results across Fermat and two Cefalu settings, but it remains a lightweight benchmark pipeline rather than a final physics experiment setup
+- Phase 7 adds multi-seed aggregation and uncertainty-style summaries, but this is still benchmark hardening rather than final metric-learning or physics modeling
+- Phase 8 strengthens protocol metadata and benchmark bookkeeping, but it remains benchmark/protocol hardening rather than final metric learning
+- Phase 9 adds named protocol presets and explicit robustness reporting, but this is still benchmark-results hardening rather than final metric learning
+- Phase 10 packages the benchmark as a publication-facing release with a harder evaluation slice and a manuscript-style memo, but it is still not final metric learning
+- Phase 11 adds versioned release validation and regeneration for external trust and reuse, but it does not change the underlying benchmark model class
 - Bundle validation is intentionally basic and meant to catch obvious issues in generated artifacts
 
 ## Contributing

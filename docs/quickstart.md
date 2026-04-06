@@ -41,9 +41,16 @@ geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 
 Run the first experiment scaffold:
 
 ```bash
-geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model local --target fs_scalar --out runs/local_cep1
-geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model global --target fs_scalar --out runs/global_cep1
-geocydata experiments compare --bundle outputs/cefalu_lambda_0_75 --target fs_scalar --out runs/compare_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model local --target hypersurface_fs_scalar --out runs/local_hfs
+geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model global --target hypersurface_fs_scalar --out runs/global_hfs
+geocydata experiments compare --bundle outputs/cefalu_lambda_0_75 --target hypersurface_fs_scalar --out runs/compare_hfs
+geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
+geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
+geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
+geocydata experiments validate-release --input releases/paper_v1_release
+geocydata experiments build-paper-assets --input releases/paper_v1_release --out paper
+geocydata experiments validate-paper-assets --release releases/paper_v1_release --paper paper
 ```
 
 ## Inspect outputs
@@ -55,6 +62,74 @@ The bundle directory contains:
 - `invariants.parquet`: projective invariant features
 - `validation_report.json`: dataset-level checks
 - `summary.md`: human-readable run summary
+
+The Phase 6 benchmark sweep directory contains:
+
+- `benchmark_manifest.json`: benchmark matrix, seeds, and artifact metadata
+- `benchmark_results.csv`: tidy benchmark table across geometry cases and model modes
+- `benchmark_results.json`: machine-readable copy of the same results
+- `benchmark_summary.md`: markdown summary of per-case winners and metric deltas
+
+With multiple seeds, the sweep directory also contains:
+
+- `benchmark_aggregated.csv`: per-case and per-model means, standard deviations, and run counts
+- `benchmark_aggregated.json`: machine-readable aggregated statistics
+- `benchmark_aggregated_summary.md`: markdown uncertainty-style summary across seeds
+
+Each experiment run also writes:
+
+- `run_manifest.json`: explicit run protocol metadata including split strategy, split seed, feature mode, and benchmark case id
+
+Each sweep case/seed combination writes:
+
+- `cases/<case_id>/seed_<seed>/case_manifest.json`: explicit case definition, bundle path, run paths, target, and split protocol
+
+Phase 9 also adds:
+
+- `benchmark_protocol.json`: resolved preset plus any explicit overrides
+- `benchmark_robustness.csv` and `benchmark_robustness.json`: case-level robustness comparisons between local and global
+- `benchmark_robustness_summary.md`: paper-style narrative summary of score gaps and seed robustness
+- `paper_table.csv`: compact table suitable for later paper/report integration
+
+Phase 10 release packaging adds:
+
+- `release_manifest.json`: top-level release manifest
+- `release_protocol.json`: frozen preset plus harder-slice configuration
+- `final_results.csv` and `final_results.json`: publication-facing core benchmark table
+- `final_robustness.csv` and `final_robustness.json`: publication-facing robustness table
+- `final_summary.md`: concise release summary
+- `results_memo.md`: manuscript-style internal results memo
+- `core_benchmark/` and optional `harder_slice/`: underlying benchmark outputs kept intact
+
+Phase 11 adds:
+
+- `release_version` and `benchmark_contract_version` in release metadata
+- `release_validation_report.json`: machine-readable release validation status
+- `release_validation_summary.md`: short markdown validation summary
+
+Phase 12A adds a paper-facing layer built from release outputs:
+
+- `paper/outline.md`, `paper/abstract_draft.md`, `paper/introduction_notes.md`
+- `paper/methods_notes.md`, `paper/results_notes.md`, `paper/reproducibility_notes.md`
+- `paper/assets/core_results_table.csv` and `.md`
+- `paper/assets/robustness_table.csv` and `.md`
+- `paper/assets/fig_core_scores.png`
+- `paper/assets/fig_hardest_case.png`
+
+The release remains the source of truth. Build or refresh the paper assets only after the release has been regenerated and validated.
+
+Phase 12B adds release-to-paper consistency validation:
+
+- `paper_validation_report.json`: machine-readable validation report for the paper layer
+- `paper_validation_summary.md`: short markdown summary of structural, table, figure, and finding checks
+
+This validation checks that paper tables remain aligned with the release outputs and that the manuscript notes still encode the expected benchmark findings. It does not perform semantic language understanding beyond explicit content checks.
+
+For external regeneration, rerun the same release preset:
+
+```bash
+geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
+```
 
 To validate an existing bundle:
 
