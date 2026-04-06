@@ -43,6 +43,7 @@ app.add_typer(validate_app, name="validate")
 def _bundle_summary(
     *,
     geometry_name: str,
+    parameters: dict[str, object],
     n_points: int,
     artifact_paths: dict[str, str],
     report: dict,
@@ -53,12 +54,17 @@ def _bundle_summary(
     artifacts = "\n".join(f"- `{name}`: `{path}`" for name, path in artifact_paths.items())
     warnings = report["warnings"] or ["none"]
     warning_text = "\n".join(f"- {warning}" for warning in warnings)
+    parameter_lines = "\n".join(f"- {name}: `{value}`" for name, value in parameters.items()) or "- none"
     return f"""# GeoCYData Bundle Summary
 
 ## Geometry
 
 - name: `{geometry_name}`
 - points: `{n_points}`
+
+## Parameters
+
+{parameter_lines}
 
 ## Validation
 
@@ -94,7 +100,31 @@ def geometry_list() -> None:
     """List the geometries available in this installation."""
 
     for name in list_geometries():
-        typer.echo(f"{name}: {GEOMETRIES[name].description}")
+        parameter_names = ", ".join(GEOMETRIES[name].metadata()["parameter_schema"]) or "none"
+        typer.echo(f"{name}: {GEOMETRIES[name].description} (parameters: {parameter_names})")
+
+
+@geometry_app.command("show")
+def geometry_show(
+    geometry: str = typer.Option(..., "--geometry", help="Registered geometry name."),
+    lambda_value: float | None = typer.Option(
+        None,
+        "--lambda",
+        help="Required family parameter for `cefalu_quartic`; omit for `fermat_quartic`.",
+    ),
+) -> None:
+    """Show metadata for one registered geometry."""
+
+    try:
+        resolved_geometry = get_geometry(geometry)
+        parameters = resolved_geometry.validate_parameters({"lambda": lambda_value})
+    except (KeyError, ValueError) as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    payload = resolved_geometry.metadata()
+    payload["parameters"] = parameters
+    typer.echo(json.dumps(payload, indent=2))
 
 
 @generate_app.command("bundle")
@@ -106,6 +136,11 @@ def generate_bundle(
     ),
     n: int = typer.Option(..., "--n", min=1, help="Number of projective points to sample."),
     seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility."),
+    lambda_value: float | None = typer.Option(
+        None,
+        "--lambda",
+        help="Required family parameter for `cefalu_quartic`; omit for `fermat_quartic`.",
+    ),
     out: Path = typer.Option(
         ...,
         "--out",
@@ -116,13 +151,28 @@ def generate_bundle(
 
     try:
         resolved_geometry = get_geometry(geometry)
+        resolved_parameters = resolved_geometry.validate_parameters({"lambda": lambda_value})
     except KeyError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except ValueError as exc:
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2) from exc
 
     output_dir = ensure_directory(out)
-    batch = generate_sample_batch(geometry_name=geometry, n=n, seed=seed)
-    report = build_validation_report(batch.points, n_points=n, seed=seed)
+    batch = generate_sample_batch(
+        geometry_name=geometry,
+        n=n,
+        seed=seed,
+        parameters=resolved_parameters,
+    )
+    report = build_validation_report(
+        batch.points,
+        geometry_name=geometry,
+        parameters=resolved_parameters,
+        n_points=n,
+        seed=seed,
+    )
 
     artifact_paths = {
         "manifest": "manifest.json",
@@ -140,6 +190,7 @@ def generate_bundle(
     (output_dir / artifact_paths["summary"]).write_text(
         _bundle_summary(
             geometry_name=geometry,
+            parameters=resolved_parameters,
             n_points=n,
             artifact_paths=artifact_paths,
             report=report,
@@ -155,6 +206,7 @@ def generate_bundle(
         parameters={
             "geometry": geometry,
             "geometry_description": resolved_geometry.description,
+            **resolved_parameters,
             "n": n,
             "seed": seed,
         },
@@ -195,6 +247,22 @@ def validate_bundle(
         )
         raise typer.Exit(code=1) from exc
 
+    manifest_path = input / "manifest.json"
+    geometry_name = "fermat_quartic"
+    parameters: dict[str, object] = {}
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            geometry_name = str(manifest.get("geometry", geometry_name))
+            parameters = dict(manifest.get("parameters", {}))
+        except Exception as exc:
+            typer.secho(
+                f"Could not read manifest.json: {exc}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1) from exc
+
     coords = []
     for idx in range(4):
         real_col = f"z{idx}_re"
@@ -208,7 +276,13 @@ def validate_bundle(
             raise typer.Exit(code=2)
         coords.append(points_df[real_col].to_numpy() + 1j * points_df[imag_col].to_numpy())
     points = np.column_stack(coords)
-    report = build_validation_report(points, n_points=len(points_df), seed=None)
+    report = build_validation_report(
+        points,
+        geometry_name=geometry_name,
+        parameters=parameters,
+        n_points=len(points_df),
+        seed=None,
+    )
     typer.echo(json.dumps(report, indent=2))
 
 

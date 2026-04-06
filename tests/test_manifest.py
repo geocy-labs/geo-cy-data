@@ -31,3 +31,15 @@ def test_manifest_contains_required_keys(tmp_path: Path) -> None:
     assert manifest["bundle_name"] == tmp_path.name
     assert manifest["bundle_path"] == str(tmp_path)
     json.dumps(manifest)
+
+
+def test_manifest_stores_cefalu_lambda(tmp_path: Path) -> None:
+    manifest = build_manifest(
+        geometry="cefalu_quartic",
+        n_points=5,
+        seed=7,
+        output_dir=tmp_path,
+        artifact_paths={"points": "points.parquet"},
+        parameters={"geometry": "cefalu_quartic", "lambda": 1.0, "n": 5, "seed": 7},
+    )
+    assert manifest["parameters"]["lambda"] == 1.0

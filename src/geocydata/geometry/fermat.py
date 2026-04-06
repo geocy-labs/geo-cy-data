@@ -20,12 +20,38 @@ class FermatQuarticGeometry:
     description: str = (
         "Initial branch-based smoke-test sampler for the Fermat quartic hypersurface in P^3."
     )
+    parameter_schema: dict[str, str] = None
 
-    def sample_points(self, n: int, rng: np.random.Generator) -> np.ndarray:
+    def validate_parameters(self, parameters: dict[str, object] | None = None) -> dict[str, object]:
+        """Validate that no family parameters were supplied."""
+
+        parameters = parameters or {}
+        if parameters.get("lambda") is not None:
+            raise ValueError("Geometry 'fermat_quartic' does not accept '--lambda'.")
+        return {}
+
+    def metadata(self) -> dict[str, object]:
+        """Return public geometry metadata for CLI display."""
+
+        return {
+            "name": self.name,
+            "ambient_dimension": self.ambient_dimension,
+            "equation": self.equation,
+            "description": self.description,
+            "parameter_schema": {},
+        }
+
+    def sample_points(
+        self,
+        n: int,
+        rng: np.random.Generator,
+        parameters: dict[str, object] | None = None,
+    ) -> np.ndarray:
         """Sample points on the Fermat quartic by solving for one branch of z3."""
 
         if n <= 0:
             raise ValueError("n must be positive.")
+        self.validate_parameters(parameters)
 
         z0 = rng.normal(size=n) + 1j * rng.normal(size=n)
         z1 = rng.normal(size=n) + 1j * rng.normal(size=n)
@@ -40,8 +66,13 @@ class FermatQuarticGeometry:
         points = np.column_stack([z0, z1, z2, z3]).astype(np.complex128)
         return normalize_homogeneous(points)
 
-    def residuals(self, points: np.ndarray) -> np.ndarray:
+    def residuals(
+        self,
+        points: np.ndarray,
+        parameters: dict[str, object] | None = None,
+    ) -> np.ndarray:
         """Evaluate absolute hypersurface residuals for sampled points."""
 
-        return hypersurface_residuals(points)
+        self.validate_parameters(parameters)
+        return hypersurface_residuals(points, geometry_name=self.name, parameters={})
 
