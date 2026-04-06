@@ -6,11 +6,12 @@
 geocydata --help
 ```
 
-The top-level CLI shows the three public command groups:
+The top-level CLI shows the public command groups:
 
 - `geometry`: inspect supported benchmarks
 - `generate`: create bundle directories
 - `validate`: re-check existing bundles
+- `experiments`: run, compare, and sweep lightweight representation benchmarks
 
 ## List geometries
 
@@ -68,23 +69,24 @@ geocydata validate symmetry --input outputs/cefalu_orbits
 ## Run one experiment
 
 ```bash
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target fs_scalar --out runs/local_cep1
-geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target fs_scalar --out runs/global_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --target hypersurface_fs_scalar --out runs/local_hfs
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --target hypersurface_fs_scalar --out runs/global_hfs
 ```
 
-The preferred target is `fs_scalar`, an ambient Fubini-Study determinant proxy computed from the affine chart coordinates. The older `invariant_weighted_sum` target remains available as a convenience/debug option.
+The preferred target is `hypersurface_fs_scalar`, a tangent-restricted Fubini-Study proxy that uses the local hypersurface gradient. The older `fs_scalar` ambient proxy and `invariant_weighted_sum` debug target both remain available.
 
 This command loads `points.parquet` and `invariants.parquet`, constructs the selected target, splits the bundle reproducibly, and writes run artifacts:
 
 - `config.json`
 - `metrics.json`
 - `predictions.parquet`
+- `run_manifest.json`
 - `summary.md`
 
 ## Compare local and global models
 
 ```bash
-geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target fs_scalar --out runs/compare_cep1
+geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target hypersurface_fs_scalar --out runs/compare_hfs
 ```
 
 This command runs both model modes on the same bundle and writes:
@@ -93,3 +95,106 @@ This command runs both model modes on the same bundle and writes:
 - `global/`
 - `comparison.json`
 - `comparison.md`
+
+## Run the standardized benchmark sweep
+
+```bash
+geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seed 7
+geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
+geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+```
+
+Default Phase 6 cases:
+
+- `fermat_quartic`
+- `cefalu_lambda_0_75`
+- `cefalu_lambda_1_0`
+
+Useful flags:
+
+- `--preset`: named benchmark protocol preset such as `paper_v1_fast`, `paper_v1_default`, or `paper_v1_multiseed`
+- `--target`: experiment target, with `hypersurface_fs_scalar` as the preferred current benchmark choice
+- `--seed`: deterministic sweep seed; repeat the option for compatibility with existing single-seed workflows
+- `--seeds`: provide multiple seeds after one flag, for example `--seeds 7 11 19`
+- `--n`: samples per generated bundle
+- `--include`: repeat to restrict the case matrix to selected benchmark ids
+- `--test-size`: validation fraction for every run
+
+This command writes:
+
+- `benchmark_protocol.json`
+- `benchmark_manifest.json`
+- `benchmark_results.csv`
+- `benchmark_results.json`
+- `benchmark_summary.md`
+- `benchmark_aggregated.csv`
+- `benchmark_aggregated.json`
+- `benchmark_aggregated_summary.md`
+- `benchmark_robustness.csv`
+- `benchmark_robustness.json`
+- `benchmark_robustness_summary.md`
+- `paper_table.csv`
+- `cases/<case_id>/seed_<seed>/case_manifest.json`
+- per-case `bundles/` and `runs/` subdirectories
+
+## Create a publication-facing release
+
+```bash
+geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release
+geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice --hard-slice cefalu_hard_v1
+geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
+geocydata experiments validate-release --input releases/paper_v1_release
+geocydata experiments build-paper-assets --input releases/paper_v1_release --out paper
+geocydata experiments validate-paper-assets --release releases/paper_v1_release --paper paper
+```
+
+This command freezes a preset-based benchmark release and writes:
+
+- `release_manifest.json`
+- `release_protocol.json`
+- `final_results.csv`
+- `final_results.json`
+- `final_robustness.csv`
+- `final_robustness.json`
+- `final_summary.md`
+- `results_memo.md`
+- `core_benchmark/`
+- optional `harder_slice/`
+
+Phase 11 validation outputs:
+
+- `release_validation_report.json`
+- `release_validation_summary.md`
+
+## Build manuscript-facing paper assets
+
+```bash
+geocydata experiments build-paper-assets --input releases/paper_v1_release --out paper
+```
+
+This command reads the frozen release outputs and writes:
+
+- manuscript scaffold notes under `paper/`
+- publication-facing tables under `paper/assets/`
+- simple matplotlib figures under `paper/assets/`
+
+The paper-assets command does not rerun the benchmark. It treats the validated release as the source of truth for tables, figures, and manuscript notes.
+
+## Validate manuscript-facing paper assets
+
+```bash
+geocydata experiments validate-paper-assets --release releases/paper_v1_release --paper paper
+```
+
+This command checks:
+
+- required paper scaffold files exist
+- required release files exist
+- paper CSV tables match the release-derived source tables
+- figure files exist and are non-empty
+- `results_notes.md` still contains the expected benchmark findings for the frozen release
+
+It writes:
+
+- `paper_validation_report.json`
+- `paper_validation_summary.md`

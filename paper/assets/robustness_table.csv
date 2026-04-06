@@ -1,0 +1,4 @@
+case_label,geometry,lambda,score_gap_mean,score_gap_std,global_beats_local_mean,global_beats_local_all_seeds,run_count
+Cefalu quartic (lambda=0.75),cefalu_quartic,0.75,0.4094703964077322,0.2788444646169459,True,True,3
+Cefalu quartic (lambda=1.0),cefalu_quartic,1.0,0.2281560128854886,0.3105173779779367,True,False,3
+Fermat quartic,fermat_quartic,,0.7585896210086119,0.0778734063573186,True,True,3

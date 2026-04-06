@@ -1,0 +1,3 @@
+# Abstract Draft
+
+GeoCYData provides a reproducible benchmark pipeline for projective hypersurface Calabi-Yau data generation and lightweight representation comparison. In the current `paper_v1_default` benchmark protocol, we evaluate local affine and global invariant baselines on the preferred `hypersurface_fs_scalar` target across Fermat and Cefalu quartic cases. The current benchmark indicates that the global model outperforms the local baseline on mean validation score in `3` of `3` core benchmark cases, while the hardest regime remains `cefalu_lambda_1_0` near the Cefalu `lambda = 1` neighborhood. These results support a meaningful but non-absolute advantage for global invariant inputs under the present benchmark contract.
