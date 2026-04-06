@@ -43,6 +43,14 @@ Arguments:
 
 On success, the command prints the output path and the artifact filenames written into that directory.
 
+## Generate symmetry orbits
+
+```bash
+geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 7 --out outputs/cefalu_orbits
+```
+
+This command exports sampled base points, orbit representatives, canonical-representative invariants, a symmetry report, and a summary markdown file.
+
 ## Validate an existing bundle
 
 ```bash
@@ -50,3 +58,9 @@ geocydata validate bundle --input outputs/demo
 ```
 
 Validation expects a bundle directory containing `points.parquet`. If required files or columns are missing, the CLI returns a non-zero exit code with a direct error message.
+
+## Validate symmetry output
+
+```bash
+geocydata validate symmetry --input outputs/cefalu_orbits
+```
