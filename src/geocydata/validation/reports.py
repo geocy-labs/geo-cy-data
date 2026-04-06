@@ -15,6 +15,8 @@ from geocydata.validation.invariance_checks import summarize_invariant_drift
 def build_validation_report(
     points: np.ndarray,
     *,
+    geometry_name: str,
+    parameters: dict[str, object] | None,
     n_points: int,
     seed: int | None,
     residual_tol: float = 1e-8,
@@ -23,7 +25,12 @@ def build_validation_report(
     """Construct a dataset-level validation report."""
 
     rng = make_rng(None if seed is None else seed + 1)
-    residuals = summarize_residuals(points)
+    resolved_parameters = parameters or {}
+    residuals = summarize_residuals(
+        points,
+        geometry_name=geometry_name,
+        parameters=resolved_parameters,
+    )
     drifts = summarize_invariant_drift(points, rng=rng)
     chart_ids, _ = select_affine_charts(points)
     chart_distribution = dict(sorted(Counter(chart_ids.tolist()).items()))
@@ -37,6 +44,8 @@ def build_validation_report(
         warnings.append("Invariant drift exceeds tolerance under random projective rescaling.")
 
     return {
+        "geometry": geometry_name,
+        "parameters": resolved_parameters,
         "n_points": n_points,
         "residual": residuals,
         "invariant_drift": drifts,

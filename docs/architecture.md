@@ -11,5 +11,5 @@ GeoCYData uses a small `src/` layout with focused modules:
 - `geocydata.export`: Parquet writing and manifest generation
 - `geocydata.utils`: logging, seeds, paths, and version helpers
 
-The current benchmark path is intentionally narrow: sample points on the Fermat quartic, compute affine and invariant representations, validate the resulting dataset, and export a documented bundle.
+The current benchmark path is intentionally narrow: sample points on the Fermat quartic or the parameterized Cefalu quartic family, compute affine and invariant representations, validate the resulting dataset, and export a documented bundle.
 

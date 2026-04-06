@@ -18,10 +18,19 @@ The top-level CLI shows the three public command groups:
 geocydata geometry list
 ```
 
+## Show one geometry
+
+```bash
+geocydata geometry show --geometry cefalu_quartic --lambda 1.0
+```
+
+For `cefalu_quartic`, `--lambda` is required. For `fermat_quartic`, omit it.
+
 ## Generate a bundle
 
 ```bash
 geocydata generate bundle --geometry fermat_quartic --n 2000 --seed 7 --out outputs/demo
+geocydata generate bundle --geometry cefalu_quartic --lambda 1.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_1_0
 ```
 
 Arguments:
@@ -29,6 +38,7 @@ Arguments:
 - `--geometry`: registered geometry name
 - `--n`: number of points to sample
 - `--seed`: random seed for reproducibility
+- `--lambda`: required for `cefalu_quartic`, omitted for `fermat_quartic`
 - `--out`: bundle directory to create or reuse
 
 On success, the command prints the output path and the artifact filenames written into that directory.

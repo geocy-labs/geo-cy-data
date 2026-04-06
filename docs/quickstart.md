@@ -17,12 +17,19 @@ Confirm the CLI is available:
 ```bash
 geocydata --help
 geocydata geometry list
+geocydata geometry show --geometry cefalu_quartic --lambda 1.0
 ```
 
 ## Generate a smoke-test bundle
 
 ```bash
 geocydata generate bundle --geometry fermat_quartic --n 2000 --seed 7 --out outputs/demo
+```
+
+Generate a Cefalu family bundle:
+
+```bash
+geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
 ```
 
 ## Inspect outputs

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from geocydata.geometry.cefalu import CefaluQuarticGeometry
 from geocydata.geometry.fermat import FermatQuarticGeometry
 
 GEOMETRIES = {
+    "cefalu_quartic": CefaluQuarticGeometry(),
     "fermat_quartic": FermatQuarticGeometry(),
 }
 
@@ -15,7 +17,7 @@ def list_geometries() -> list[str]:
     return sorted(GEOMETRIES)
 
 
-def get_geometry(name: str) -> FermatQuarticGeometry:
+def get_geometry(name: str):
     """Resolve a geometry from the registry."""
 
     try:

@@ -32,6 +32,31 @@ def test_cli_generates_bundle(tmp_path: Path) -> None:
     assert "GeoCYData bundle written to" in result.stdout
 
 
+def test_cli_generates_cefalu_bundle(tmp_path: Path) -> None:
+    output_dir = tmp_path / "cefalu-demo"
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "bundle",
+            "--geometry",
+            "cefalu_quartic",
+            "--lambda",
+            "1.0",
+            "--n",
+            "200",
+            "--seed",
+            "7",
+            "--out",
+            str(output_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (output_dir / "manifest.json").exists()
+    assert (output_dir / "points.parquet").exists()
+    assert (output_dir / "invariants.parquet").exists()
+
+
 def test_validate_bundle_reports_missing_points_file(tmp_path: Path) -> None:
     result = runner.invoke(app, ["validate", "bundle", "--input", str(tmp_path)])
     assert result.exit_code == 2

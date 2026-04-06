@@ -9,6 +9,7 @@ Research workflows around Calabi-Yau benchmark data often start as one-off scrip
 ## Key features
 
 - Reproducible bundle generation for the Fermat quartic benchmark in `P^3`
+- Parameterized bundle generation for the Cefalu quartic family in `P^3`
 - Simple branch-based sampler for complex homogeneous points on the hypersurface
 - Affine chart extraction and projective invariant feature generation
 - Bundle-level validation with residual and invariance drift reporting
@@ -33,12 +34,20 @@ Verify the install:
 ```bash
 geocydata --help
 geocydata geometry list
+geocydata geometry show --geometry cefalu_quartic --lambda 1.0
 ```
 
 ## Fastest smoke test
 
 ```bash
 geocydata generate bundle --geometry fermat_quartic --n 2000 --seed 7 --out outputs/demo
+```
+
+Parameterized Cefalu examples:
+
+```bash
+geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
+geocydata generate bundle --geometry cefalu_quartic --lambda 1.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_1_0
 ```
 
 ## Expected output bundle
@@ -63,7 +72,7 @@ geocydata validate bundle --input outputs/demo
 ## Supported geometries
 
 - `fermat_quartic`: Fermat quartic hypersurface in `P^3`
-- More benchmark geometries are planned, but not included in `v0.1`
+- `cefalu_quartic`: parameterized quartic family with required `--lambda`
 
 ## Documentation
 
@@ -75,8 +84,7 @@ geocydata validate bundle --input outputs/demo
 
 ## Current limitations
 
-- `v0.1` supports only `fermat_quartic`
-- The sampler is a documented branch-based smoke-test method, not a uniform sampler over the hypersurface
+- The current samplers are documented branch-based smoke-test methods, not uniform samplers over the hypersurfaces
 - Bundle validation is intentionally basic and meant to catch obvious issues in generated artifacts
 
 ## Contributing
