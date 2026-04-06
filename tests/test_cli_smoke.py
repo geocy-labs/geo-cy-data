@@ -88,3 +88,39 @@ def test_cli_generates_cefalu_orbit_bundle(tmp_path: Path) -> None:
     assert (output_dir / "invariants.parquet").exists()
     assert (output_dir / "orbits.parquet").exists()
     assert (output_dir / "symmetry_report.json").exists()
+
+
+def test_cli_experiment_compare_smoke(tmp_path: Path) -> None:
+    bundle_dir = tmp_path / "bundle"
+    bundle_result = runner.invoke(
+        app,
+        [
+            "generate",
+            "bundle",
+            "--geometry",
+            "cefalu_quartic",
+            "--lambda",
+            "1.0",
+            "--n",
+            "40",
+            "--seed",
+            "7",
+            "--out",
+            str(bundle_dir),
+        ],
+    )
+    assert bundle_result.exit_code == 0, bundle_result.output
+    compare_dir = tmp_path / "compare"
+    compare_result = runner.invoke(
+        app,
+        [
+            "experiments",
+            "compare",
+            "--bundle",
+            str(bundle_dir),
+            "--out",
+            str(compare_dir),
+        ],
+    )
+    assert compare_result.exit_code == 0, compare_result.output
+    assert (compare_dir / "comparison.json").exists()

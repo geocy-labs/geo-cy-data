@@ -73,6 +73,23 @@ Includes:
 - canonical invariant drift
 - warnings and pass/fail summary
 
+## Experiment run artifacts
+
+Produced by `geocydata experiments run`.
+
+- `config.json`: run configuration including bundle path, model mode, seed, and split fraction
+- `metrics.json`: train/validation scores, error metrics, run time, feature dimension, and geometry metadata
+- `predictions.parquet`: point ids, split labels, ground-truth target values, and predictions
+- `summary.md`: short markdown summary of the run
+
+## Experiment comparison artifacts
+
+Produced by `geocydata experiments compare`.
+
+- `local/` and `global/`: per-model run artifacts
+- `comparison.json`: side-by-side summary of local and global metrics
+- `comparison.md`: short markdown comparison report
+
 ## Naming notes
 
 GeoCYData does not force a bundle directory name. The user supplies the output path with `--out`, and that directory name is recorded in the manifest.

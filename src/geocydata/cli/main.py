@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import typer
 
+from geocydata.experiments.runner import compare_experiments, run_experiment
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
 from geocydata.registry.geometries import GEOMETRIES, get_geometry, list_geometries
@@ -40,10 +41,15 @@ validate_app = typer.Typer(
     help="Validate an existing GeoCYData bundle directory.",
     no_args_is_help=True,
 )
+experiments_app = typer.Typer(
+    help="Run lightweight representation-comparison experiments on GeoCYData bundles.",
+    no_args_is_help=True,
+)
 
 app.add_typer(geometry_app, name="geometry")
 app.add_typer(generate_app, name="generate")
 app.add_typer(validate_app, name="validate")
+app.add_typer(experiments_app, name="experiments")
 
 
 def _bundle_summary(
@@ -490,3 +496,60 @@ def run() -> None:
     """Console script entrypoint."""
 
     app()
+
+
+@experiments_app.command("run")
+def experiments_run(
+    bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
+    model: str = typer.Option(..., "--model", help="Experiment model: `local` or `global`."),
+    out: Path = typer.Option(..., "--out", help="Output run directory."),
+    seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
+    test_size: float = typer.Option(0.2, "--test-size", min=0.05, max=0.5, help="Validation fraction."),
+) -> None:
+    """Run one lightweight experiment against a GeoCYData bundle."""
+
+    if model not in {"local", "global"}:
+        typer.secho("Experiment model must be either 'local' or 'global'.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+    try:
+        metrics = run_experiment(
+            bundle_dir=bundle,
+            model_name=model,
+            out_dir=out,
+            seed=seed,
+            test_size=test_size,
+        )
+    except Exception as exc:
+        typer.secho(f"Experiment run failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Experiment run written to {out}")
+    typer.echo(
+        f"Validation score: {metrics['validation_score']:.6f}, "
+        f"validation MSE: {metrics['validation_mse']:.6e}"
+    )
+
+
+@experiments_app.command("compare")
+def experiments_compare(
+    bundle: Path = typer.Option(..., "--bundle", exists=True, file_okay=False, help="Input bundle directory."),
+    out: Path = typer.Option(..., "--out", help="Output comparison directory."),
+    seed: int = typer.Option(7, "--seed", help="Deterministic train/validation split seed."),
+    test_size: float = typer.Option(0.2, "--test-size", min=0.05, max=0.5, help="Validation fraction."),
+) -> None:
+    """Run local and global experiment modes and compare their results."""
+
+    try:
+        comparison = compare_experiments(
+            bundle_dir=bundle,
+            out_dir=out,
+            seed=seed,
+            test_size=test_size,
+        )
+    except Exception as exc:
+        typer.secho(f"Experiment comparison failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Experiment comparison written to {out}")
+    typer.echo(
+        f"Local val score: {comparison['local']['validation_score']:.6f}, "
+        f"Global val score: {comparison['global']['validation_score']:.6f}"
+    )

@@ -64,3 +64,30 @@ Validation expects a bundle directory containing `points.parquet`. If required f
 ```bash
 geocydata validate symmetry --input outputs/cefalu_orbits
 ```
+
+## Run one experiment
+
+```bash
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model local --out runs/local_cep1
+geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --out runs/global_cep1
+```
+
+This command loads `points.parquet` and `invariants.parquet`, constructs a deterministic scalar target from the invariant table, splits the bundle reproducibly, and writes run artifacts:
+
+- `config.json`
+- `metrics.json`
+- `predictions.parquet`
+- `summary.md`
+
+## Compare local and global models
+
+```bash
+geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --out runs/compare_cep1
+```
+
+This command runs both model modes on the same bundle and writes:
+
+- `local/`
+- `global/`
+- `comparison.json`
+- `comparison.md`
