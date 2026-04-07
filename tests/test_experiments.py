@@ -773,9 +773,14 @@ def test_validate_paper_assets_finding_consistency_failure(tmp_path: Path) -> No
     paper_dir = tmp_path / "paper"
     create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
+    release_robustness = pd.read_csv(release_dir / "final_robustness.csv")
+    hardest_core_case = str(
+        release_robustness.loc[release_robustness["absolute_score_gap_mean"].idxmin(), "benchmark_case"]
+    )
     results_notes_path = paper_dir / "results_notes.md"
     results_notes = results_notes_path.read_text(encoding="utf-8")
-    results_notes_path.write_text(results_notes.replace("cefalu_lambda_1_0", "fermat_quartic", 1), encoding="utf-8")
+    replacement = "fermat_quartic" if hardest_core_case != "fermat_quartic" else "cefalu_lambda_0_75"
+    results_notes_path.write_text(results_notes.replace(hardest_core_case, replacement, 1), encoding="utf-8")
     report = validate_paper_assets(release_dir=release_dir, paper_dir=paper_dir)
     assert report["passed"] is False
     assert any("hardest core case" in failure for failure in report["failures"])
