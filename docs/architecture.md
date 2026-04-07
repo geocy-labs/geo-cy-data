@@ -3,7 +3,7 @@
 GeoCYData uses a small `src/` layout with focused modules:
 
 - `geocydata.cli`: Typer-based command-line interface
-- `geocydata.registry`: benchmark geometry registry
+- `geocydata.registry`: benchmark geometry registry plus named case/preset definitions
 - `geocydata.geometry`: projective utilities, hypersurface evaluation, Fermat quartic model, and affine chart logic
 - `geocydata.sampling`: point generation for benchmark geometries
 - `geocydata.features`: invariant feature construction from normalized outer products
@@ -12,6 +12,13 @@ GeoCYData uses a small `src/` layout with focused modules:
 - `geocydata.utils`: logging, seeds, paths, and version helpers
 
 The current benchmark path is intentionally narrow: sample points on the Fermat quartic or the parameterized Cefalu quartic family, compute affine and invariant representations, validate the resulting dataset, and export a documented bundle.
+
+For Paper 1 / GlobalCY, the geometry layer now also exposes named case ids and fixed slices:
+
+- core fixed Cefalu cases at `lambda = 0.0, 0.75, 1.0, 1.5, 3.0`
+- near-singular slices around `lambda = 0.75` and `lambda = 1.0`
+
+These case definitions live in `geocydata.registry.cases` and are reused by direct bundle exports, sweeps, releases, and downstream model-facing metadata.
 
 Phase 3 adds a small symmetry layer for the Cefalu family:
 
@@ -48,6 +55,14 @@ Phase 8 hardens the experiment protocol further:
 - `geocydata.experiments.runner`: records explicit split strategy, split seed, feature mode, benchmark case id, and run manifests
 - `geocydata.experiments.sweep`: writes explicit case manifests so benchmark case definitions and run paths are reusable and inspectable
 - `geocydata.experiments.reporting`: records target status and protocol metadata in per-seed and aggregated summaries
+
+The direct `generate bundle` path now also acts as a model-facing geometry export profile:
+
+- `points.parquet` carries homogeneous coordinates, chosen chart ids, affine chart coordinates, and explicit case metadata
+- `invariants.parquet` carries invariant features plus case metadata
+- `sample_weights.parquet` packages reproducible sample-weight helpers
+- `evaluation_summary.json` records chart consistency, invariance drift, symmetry consistency, positivity/eigenvalue summaries, and a lightweight characteristic-form / Euler hook
+- `cefalu_quartic` direct bundles additionally include canonical representatives, canonical invariants, and lightweight orbit metadata
 
 Phase 9 adds a thin paper-style protocol layer:
 

@@ -78,6 +78,7 @@ def write_benchmark_results(
 ) -> None:
     """Write standardized machine-readable benchmark outputs."""
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(output_dir / "benchmark_results.csv", index=False)
     (output_dir / "benchmark_results.json").write_text(
         json.dumps(_json_ready_records(results_df), indent=2),
@@ -146,6 +147,7 @@ def write_benchmark_aggregated_results(
 ) -> None:
     """Write aggregated benchmark metrics across seeds."""
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     aggregated_df.to_csv(output_dir / "benchmark_aggregated.csv", index=False)
     (output_dir / "benchmark_aggregated.json").write_text(
         json.dumps(_json_ready_records(aggregated_df), indent=2),
@@ -246,6 +248,7 @@ def write_benchmark_robustness_outputs(
 ) -> None:
     """Write robustness outputs and a compact paper-style table."""
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     robustness_df.to_csv(output_dir / "benchmark_robustness.csv", index=False)
     (output_dir / "benchmark_robustness.json").write_text(
         json.dumps(_json_ready_records(robustness_df), indent=2),

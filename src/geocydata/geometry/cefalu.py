@@ -79,9 +79,12 @@ class CefaluQuarticGeometry:
                 0.0,
                 quartic_sum - (lambda_value / 3.0) * (square_sum**2),
             ]
-            candidate_roots = np.roots(coeffs)
+            trimmed = np.array(coeffs, dtype=np.complex128)
+            while len(trimmed) > 1 and np.isclose(trimmed[0], 0.0):
+                trimmed = trimmed[1:]
+            candidate_roots = np.roots(trimmed)
             ordered = candidate_roots[np.argsort(np.angle(candidate_roots))]
-            roots[idx] = ordered[branches[idx]]
+            roots[idx] = ordered[int(branches[idx]) % len(ordered)]
 
         points = np.column_stack([z0, z1, z2, roots]).astype(np.complex128)
         return normalize_homogeneous(points)

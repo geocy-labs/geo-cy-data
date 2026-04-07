@@ -17,6 +17,7 @@ from geocydata.experiments.validate_release import validate_benchmark_release
 from geocydata.experiments.validate_paper_assets import validate_paper_assets
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
+from geocydata.registry.cases import derive_case_id
 from geocydata.registry.geometries import GEOMETRIES, get_geometry, list_geometries
 from geocydata.sampling.point_sampler import generate_sample_batch
 from geocydata.symmetry.canonicalize import canonical_key_string
@@ -72,12 +73,16 @@ def _bundle_summary(
     warnings = report["warnings"] or ["none"]
     warning_text = "\n".join(f"- {warning}" for warning in warnings)
     parameter_lines = "\n".join(f"- {name}: `{value}`" for name, value in parameters.items()) or "- none"
+    evaluation = report.get("geometry_evaluation_hooks") or {}
+    positivity = evaluation.get("positivity_eigenvalue_summary") or {}
+    symmetry = evaluation.get("symmetry_consistency") or {}
     return f"""# GeoCYData Bundle Summary
 
 ## Geometry
 
 - name: `{geometry_name}`
 - points: `{n_points}`
+- case_id: `{parameters.get("case_id")}`
 
 ## Parameters
 
@@ -90,6 +95,12 @@ def _bundle_summary(
 - max invariant drift: `{report["invariant_drift"]["max"]:.3e}`
 - mean invariant drift: `{report["invariant_drift"]["mean"]:.3e}`
 - passed: `{report["passed"]}`
+
+## Geometry-aware hooks
+
+- positivity check passed: `{positivity.get("passed")}`
+- hypersurface scalar mean: `{positivity.get("hypersurface_scalar_mean")}`
+- symmetry hook available: `{bool(symmetry)}`
 
 ## Chart distribution
 
@@ -229,6 +240,7 @@ def generate_bundle(
         n=n,
         seed=seed,
         parameters=resolved_parameters,
+        include_symmetry_exports=geometry == "cefalu_quartic",
     )
     report = build_validation_report(
         batch.points,
@@ -236,25 +248,65 @@ def generate_bundle(
         parameters=resolved_parameters,
         n_points=n,
         seed=seed,
+        points_df=batch.points_df,
     )
+    case_id = derive_case_id(geometry, resolved_parameters)
+    case_metadata = {
+        "case_id": case_id,
+        "geometry": geometry,
+        "lambda": resolved_parameters.get("lambda"),
+        "seed": seed,
+        "n": n,
+    }
 
     artifact_paths = {
         "manifest": "manifest.json",
+        "case_metadata": "case_metadata.json",
         "points": "points.parquet",
         "invariants": "invariants.parquet",
+        "sample_weights": "sample_weights.parquet",
         "validation_report": "validation_report.json",
+        "evaluation_summary": "evaluation_summary.json",
         "summary": "summary.md",
     }
+    if batch.canonical_representatives_df is not None:
+        artifact_paths["canonical_representatives"] = "canonical_representatives.parquet"
+    if batch.canonical_invariants_df is not None:
+        artifact_paths["canonical_invariants"] = "canonical_invariants.parquet"
+    if batch.orbits_df is not None:
+        artifact_paths["orbits"] = "orbits.parquet"
+        artifact_paths["symmetry_report"] = "symmetry_report.json"
     write_parquet(batch.points_df, output_dir / artifact_paths["points"])
     write_parquet(batch.invariants_df, output_dir / artifact_paths["invariants"])
+    write_parquet(batch.sample_weights_df, output_dir / artifact_paths["sample_weights"])
+    if batch.canonical_representatives_df is not None:
+        write_parquet(batch.canonical_representatives_df, output_dir / artifact_paths["canonical_representatives"])
+    if batch.canonical_invariants_df is not None:
+        write_parquet(batch.canonical_invariants_df, output_dir / artifact_paths["canonical_invariants"])
+    if batch.orbits_df is not None:
+        write_parquet(batch.orbits_df, output_dir / artifact_paths["orbits"])
     (output_dir / artifact_paths["validation_report"]).write_text(
         json.dumps(report, indent=2),
         encoding="utf-8",
     )
+    (output_dir / artifact_paths["evaluation_summary"]).write_text(
+        json.dumps(report.get("geometry_evaluation_hooks", {}), indent=2),
+        encoding="utf-8",
+    )
+    (output_dir / artifact_paths["case_metadata"]).write_text(
+        json.dumps(case_metadata, indent=2),
+        encoding="utf-8",
+    )
+    if batch.orbits_df is not None:
+        symmetry_report = report["geometry_evaluation_hooks"]["symmetry_consistency"]
+        (output_dir / artifact_paths["symmetry_report"]).write_text(
+            json.dumps(symmetry_report, indent=2),
+            encoding="utf-8",
+        )
     (output_dir / artifact_paths["summary"]).write_text(
         _bundle_summary(
             geometry_name=geometry,
-            parameters=resolved_parameters,
+            parameters={**resolved_parameters, "case_id": case_id},
             n_points=n,
             artifact_paths=artifact_paths,
             report=report,
@@ -271,13 +323,20 @@ def generate_bundle(
             "geometry": geometry,
             "geometry_description": resolved_geometry.description,
             **resolved_parameters,
+            "case_id": case_id,
             "n": n,
             "seed": seed,
+        },
+        case_id=case_id,
+        protocol_metadata={
+            "paper1_ready": geometry == "cefalu_quartic" and case_id.startswith("cefalu_lambda_"),
+            "export_profile": "globalcy_paper1_model_ready",
         },
     )
     write_manifest(manifest, output_dir / artifact_paths["manifest"])
     typer.echo(f"GeoCYData bundle written to {output_dir}")
-    typer.echo("Artifacts: manifest.json, points.parquet, invariants.parquet, validation_report.json, summary.md")
+    typer.echo(f"Case id: {case_id}")
+    typer.echo("Artifacts include points, invariants, sample weights, evaluation summaries, and model-facing metadata tables.")
 
 
 @generate_app.command("orbits")
@@ -323,6 +382,7 @@ def generate_orbits(
         n=n,
         seed=seed,
         parameters=resolved_parameters,
+        include_symmetry_exports=False,
     )
     lambda_float = float(resolved_parameters["lambda"])
     orbits_df = build_orbits_dataframe(batch.points, lambda_value=lambda_float)
@@ -440,6 +500,7 @@ def validate_bundle(
         parameters=parameters,
         n_points=len(points_df),
         seed=None,
+        points_df=points_df,
     )
     typer.echo(json.dumps(report, indent=2))
 

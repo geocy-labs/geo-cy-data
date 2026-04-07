@@ -44,7 +44,7 @@ def test_cli_generates_cefalu_bundle(tmp_path: Path) -> None:
             "--lambda",
             "1.0",
             "--n",
-            "200",
+            "48",
             "--seed",
             "7",
             "--out",
@@ -52,9 +52,41 @@ def test_cli_generates_cefalu_bundle(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
+    assert "Case id: cefalu_lambda_1_0" in result.output
     assert (output_dir / "manifest.json").exists()
     assert (output_dir / "points.parquet").exists()
     assert (output_dir / "invariants.parquet").exists()
+    assert (output_dir / "sample_weights.parquet").exists()
+    assert (output_dir / "case_metadata.json").exists()
+    assert (output_dir / "evaluation_summary.json").exists()
+    assert (output_dir / "canonical_representatives.parquet").exists()
+    assert (output_dir / "orbits.parquet").exists()
+    assert (output_dir / "symmetry_report.json").exists()
+
+
+def test_cli_generates_paper1_cefalu_bundle(tmp_path: Path) -> None:
+    output_dir = tmp_path / "cefalu-paper1"
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "bundle",
+            "--geometry",
+            "cefalu_quartic",
+            "--lambda",
+            "1.5",
+            "--n",
+            "32",
+            "--seed",
+            "7",
+            "--out",
+            str(output_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Case id: cefalu_lambda_1_5" in result.output
+    assert (output_dir / "sample_weights.parquet").exists()
+    assert (output_dir / "canonical_invariants.parquet").exists()
 
 
 def test_validate_bundle_reports_missing_points_file(tmp_path: Path) -> None:
