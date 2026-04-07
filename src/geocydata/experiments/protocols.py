@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from geocydata.registry.cases import NEAR_SINGULAR_SLICES, PAPER1_CORE_CASE_IDS
+
 
 @dataclass(frozen=True)
 class ProtocolPreset:
@@ -39,7 +41,7 @@ PROTOCOL_PRESETS: dict[str, ProtocolPreset] = {
         description="Single-seed paper-style smoke benchmark for quick checks.",
         target_name="hypersurface_fs_scalar",
         seeds=(7,),
-        n_samples=120,
+        n_samples=64,
         include=("fermat_quartic", "cefalu_lambda_0_75", "cefalu_lambda_1_0"),
     ),
     "paper_v1_default": ProtocolPreset(
@@ -58,6 +60,30 @@ PROTOCOL_PRESETS: dict[str, ProtocolPreset] = {
         n_samples=200,
         include=("fermat_quartic", "cefalu_lambda_0_75", "cefalu_lambda_1_0"),
     ),
+    "globalcy_paper1_core": ProtocolPreset(
+        name="globalcy_paper1_core",
+        description="Paper 1 GlobalCY core geometry matrix across the first fixed Cefalu cases.",
+        target_name="hypersurface_fs_scalar",
+        seeds=(7,),
+        n_samples=200,
+        include=PAPER1_CORE_CASE_IDS,
+    ),
+    "globalcy_paper1_near_0_75": ProtocolPreset(
+        name="globalcy_paper1_near_0_75",
+        description="Paper 1 near-singular Cefalu slice around lambda=0.75.",
+        target_name="hypersurface_fs_scalar",
+        seeds=(7,),
+        n_samples=200,
+        include=NEAR_SINGULAR_SLICES["cefalu_near_lambda_0_75"],
+    ),
+    "globalcy_paper1_near_1_0": ProtocolPreset(
+        name="globalcy_paper1_near_1_0",
+        description="Paper 1 near-singular Cefalu slice around lambda=1.0.",
+        target_name="hypersurface_fs_scalar",
+        seeds=(7,),
+        n_samples=200,
+        include=NEAR_SINGULAR_SLICES["cefalu_near_lambda_1_0"],
+    ),
 }
 
 
@@ -65,8 +91,18 @@ HARD_EVALUATION_SLICES: dict[str, dict[str, object]] = {
     "cefalu_hard_v1": {
         "name": "cefalu_hard_v1",
         "description": "Harder Cefalu neighborhood around lambda=1.0 for robustness-focused evaluation.",
-        "include": ["cefalu_lambda_0_99", "cefalu_lambda_1_00", "cefalu_lambda_1_01"],
-    }
+        "include": ["cefalu_lambda_0_99", "cefalu_lambda_1_0", "cefalu_lambda_1_01"],
+    },
+    "globalcy_near_lambda_0_75": {
+        "name": "globalcy_near_lambda_0_75",
+        "description": "Fixed near-singular slice around lambda=0.75 for GlobalCY Paper 1.",
+        "include": list(NEAR_SINGULAR_SLICES["cefalu_near_lambda_0_75"]),
+    },
+    "globalcy_near_lambda_1_0": {
+        "name": "globalcy_near_lambda_1_0",
+        "description": "Fixed near-singular slice around lambda=1.0 for GlobalCY Paper 1.",
+        "include": list(NEAR_SINGULAR_SLICES["cefalu_near_lambda_1_0"]),
+    },
 }
 
 

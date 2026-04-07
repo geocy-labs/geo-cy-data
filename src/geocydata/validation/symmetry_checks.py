@@ -72,6 +72,48 @@ def build_canonical_invariants_dataframe(points: np.ndarray, lambda_value: float
     return pd.DataFrame(rows)
 
 
+def build_orbit_metadata_dataframe(points: np.ndarray, lambda_value: float) -> pd.DataFrame:
+    """Build lightweight orbit metadata for one batch of Cefalu points."""
+
+    actions = cefalu_symmetry_actions()
+    rows: list[dict[str, object]] = []
+    for point_id, point in enumerate(points):
+        _, canonical_point = choose_canonical_representative(point, actions)
+        orbit_size = len({canonical_key(image) for _, image in generate_orbit(point, actions)})
+        rows.append(
+            {
+                "point_id": point_id,
+                "canonical_key": canonical_key_string(canonical_point),
+                "orbit_size": orbit_size,
+                "group_size": len(actions),
+                "family_lambda": lambda_value,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_canonical_representatives_dataframe(points: np.ndarray, lambda_value: float) -> pd.DataFrame:
+    """Build a canonical representative table for one batch of Cefalu points."""
+
+    actions = cefalu_symmetry_actions()
+    rows: list[dict[str, object]] = []
+    for point_id, point in enumerate(points):
+        _, canonical_point = choose_canonical_representative(point, actions)
+        canonical = phase_normalize(canonical_point)
+        orbit_size = len({canonical_key(image) for _, image in generate_orbit(point, actions)})
+        row: dict[str, object] = {
+            "point_id": point_id,
+            "canonical_key": canonical_key_string(canonical),
+            "orbit_size": orbit_size,
+            "family_lambda": lambda_value,
+        }
+        for coord_idx in range(canonical.shape[0]):
+            row[f"z{coord_idx}_re"] = float(canonical[coord_idx].real)
+            row[f"z{coord_idx}_im"] = float(canonical[coord_idx].imag)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def build_symmetry_report(
     points: np.ndarray,
     *,

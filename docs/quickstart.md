@@ -32,6 +32,16 @@ Generate a Cefalu family bundle:
 geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
 ```
 
+Paper 1 / GlobalCY fixed Cefalu cases:
+
+```bash
+geocydata generate bundle --geometry cefalu_quartic --lambda 0.0 --n 512 --seed 7 --out outputs/cefalu_lambda_0_0
+geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 512 --seed 7 --out outputs/cefalu_lambda_0_75
+geocydata generate bundle --geometry cefalu_quartic --lambda 1.0 --n 512 --seed 7 --out outputs/cefalu_lambda_1_0
+geocydata generate bundle --geometry cefalu_quartic --lambda 1.5 --n 512 --seed 7 --out outputs/cefalu_lambda_1_5
+geocydata generate bundle --geometry cefalu_quartic --lambda 3.0 --n 512 --seed 7 --out outputs/cefalu_lambda_3_0
+```
+
 Generate Cefalu symmetry orbits:
 
 ```bash
@@ -46,6 +56,9 @@ geocydata experiments run --bundle outputs/cefalu_lambda_0_75 --model global --t
 geocydata experiments compare --bundle outputs/cefalu_lambda_0_75 --target hypersurface_fs_scalar --out runs/compare_hfs
 geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
 geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+geocydata experiments sweep --preset globalcy_paper1_core --out runs/globalcy_paper1_core
+geocydata experiments sweep --preset globalcy_paper1_near_0_75 --out runs/globalcy_near_0_75
+geocydata experiments sweep --preset globalcy_paper1_near_1_0 --out runs/globalcy_near_1_0
 geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
 geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
 geocydata experiments validate-release --input releases/paper_v1_release
@@ -58,10 +71,20 @@ geocydata experiments validate-paper-assets --release releases/paper_v1_release 
 The bundle directory contains:
 
 - `manifest.json`: metadata for the run and artifact paths
-- `points.parquet`: sampled homogeneous and affine point data
-- `invariants.parquet`: projective invariant features
+- `case_metadata.json`: explicit `geometry`, `lambda`, `seed`, and `case_id`
+- `points.parquet`: sampled homogeneous coordinates, chosen chart ids, affine chart coordinates, and case metadata
+- `invariants.parquet`: projective invariant features plus case metadata
+- `sample_weights.parquet`: model-facing sample weights with uniform, chart-balance, symmetry, and combined weights
 - `validation_report.json`: dataset-level checks
+- `evaluation_summary.json`: geometry-aware export hooks for chart consistency, invariance drift, symmetry consistency, positivity, and Euler-style summaries
 - `summary.md`: human-readable run summary
+
+For direct `cefalu_quartic` bundles, GeoCYData also writes:
+
+- `canonical_representatives.parquet`
+- `canonical_invariants.parquet`
+- `orbits.parquet`
+- `symmetry_report.json`
 
 The Phase 6 benchmark sweep directory contains:
 

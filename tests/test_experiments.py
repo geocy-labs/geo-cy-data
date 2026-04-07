@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from geocydata.cli.main import app
 from geocydata.experiments.data import build_target, load_bundle_dataset, prepare_experiment_matrix
 from geocydata.experiments.paper_assets import build_paper_assets
-from geocydata.experiments.protocols import PROTOCOL_PRESETS, resolve_protocol_preset
+from geocydata.experiments.protocols import HARD_EVALUATION_SLICES, PROTOCOL_PRESETS, resolve_protocol_preset
 from geocydata.experiments.release import create_benchmark_release
 from geocydata.experiments.runner import compare_experiments, run_experiment
 from geocydata.experiments.sweep import BENCHMARK_CASES, sweep_experiments
@@ -16,7 +16,9 @@ from geocydata.experiments.validate_paper_assets import validate_paper_assets
 from geocydata.experiments.validate_release import validate_benchmark_release
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
+from geocydata.registry.cases import canonicalize_cefalu_lambda_case_id, derive_case_id
 from geocydata.sampling.point_sampler import generate_sample_batch
+from geocydata.validation.reports import build_validation_report
 
 
 def create_bundle(tmp_path: Path, *, geometry: str = "cefalu_quartic", lambda_value: float = 1.0) -> Path:
@@ -57,6 +59,29 @@ def test_protocol_preset_resolution() -> None:
     assert preset.target_name == "hypersurface_fs_scalar"
     assert list(preset.seeds) == [7, 11, 19]
     assert "paper_v1_multiseed" in PROTOCOL_PRESETS
+    assert "globalcy_paper1_core" in PROTOCOL_PRESETS
+    assert "globalcy_paper1_near_0_75" in PROTOCOL_PRESETS
+    assert "globalcy_near_lambda_1_0" in HARD_EVALUATION_SLICES
+
+
+def test_globalcy_paper1_core_preset_cases() -> None:
+    preset = resolve_protocol_preset("globalcy_paper1_core")
+    assert preset.include == (
+        "fermat_quartic",
+        "cefalu_lambda_0_0",
+        "cefalu_lambda_0_75",
+        "cefalu_lambda_1_0",
+        "cefalu_lambda_1_5",
+        "cefalu_lambda_3_0",
+    )
+
+
+def test_cefalu_case_id_canonicalization() -> None:
+    assert canonicalize_cefalu_lambda_case_id(0.75) == "cefalu_lambda_0_75"
+    assert canonicalize_cefalu_lambda_case_id(1.0) == "cefalu_lambda_1_0"
+    assert canonicalize_cefalu_lambda_case_id(1.5) == "cefalu_lambda_1_5"
+    assert canonicalize_cefalu_lambda_case_id(3.0) == "cefalu_lambda_3_0"
+    assert derive_case_id("cefalu_quartic", {"lambda": 1.0}) == "cefalu_lambda_1_0"
 
 
 def test_geometry_target_computation_smoke(tmp_path: Path) -> None:
@@ -66,6 +91,57 @@ def test_geometry_target_computation_smoke(tmp_path: Path) -> None:
     assert target_name == "fs_scalar"
     assert target.shape[0] == dataset.points_df.shape[0]
     assert float(target.min()) > 0.0
+
+
+def test_paper1_cefalu_sample_batch_exports() -> None:
+    batch = generate_sample_batch(
+        geometry_name="cefalu_quartic",
+        n=16,
+        seed=7,
+        parameters={"lambda": 1.5},
+        include_symmetry_exports=True,
+    )
+    assert "case_id" in batch.points_df.columns
+    assert "case_id" in batch.invariants_df.columns
+    assert "combined_weight" in batch.sample_weights_df.columns
+    assert batch.orbits_df is not None
+    assert batch.canonical_representatives_df is not None
+    assert batch.canonical_invariants_df is not None
+    assert set(batch.points_df["case_id"]) == {"cefalu_lambda_1_5"}
+
+
+def test_paper1_cefalu_lambda_three_sample_batch_smoke() -> None:
+    batch = generate_sample_batch(
+        geometry_name="cefalu_quartic",
+        n=16,
+        seed=7,
+        parameters={"lambda": 3.0},
+    )
+    assert batch.points.shape == (16, 4)
+    assert set(batch.points_df["case_id"]) == {"cefalu_lambda_3_0"}
+
+
+def test_validation_report_contains_paper1_geometry_hooks() -> None:
+    batch = generate_sample_batch(
+        geometry_name="cefalu_quartic",
+        n=12,
+        seed=7,
+        parameters={"lambda": 0.75},
+    )
+    report = build_validation_report(
+        batch.points,
+        geometry_name="cefalu_quartic",
+        parameters={"lambda": 0.75},
+        n_points=12,
+        seed=7,
+        points_df=batch.points_df,
+    )
+    hooks = report["geometry_evaluation_hooks"]
+    assert hooks["chart_consistency"]["pivot_abs_min"] > 0.0
+    assert "projective_invariance_drift" in hooks
+    assert hooks["symmetry_consistency"] is not None
+    assert "positivity_eigenvalue_summary" in hooks
+    assert hooks["characteristic_form_euler_summary"]["euler_characteristic_reference"] == 24
 
 
 def test_hypersurface_target_computation_smoke(tmp_path: Path) -> None:
@@ -230,6 +306,23 @@ def test_hypersurface_target_sweep_subset(tmp_path: Path) -> None:
     assert len(result["results"]) == 4
     assert len(result["aggregated_results"]) == 2
     assert set(result["results"]["target"]) == {"hypersurface_fs_scalar"}
+
+
+def test_direct_generation_and_sweep_share_canonical_lambda_one_case_id(tmp_path: Path) -> None:
+    bundle_dir = create_bundle(tmp_path, geometry="cefalu_quartic", lambda_value=1.0)
+    bundle_manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    sweep_dir = tmp_path / "canonical-case-sweep"
+    result = sweep_experiments(
+        out_dir=sweep_dir,
+        target_name="hypersurface_fs_scalar",
+        seeds=[7],
+        n=24,
+        include=["cefalu_lambda_1_0"],
+        test_size=0.25,
+    )
+    assert bundle_manifest["case_id"] == "cefalu_lambda_1_0"
+    assert set(result["results"]["benchmark_case"]) == {"cefalu_lambda_1_0"}
+    assert set(result["aggregated_results"]["benchmark_case"]) == {"cefalu_lambda_1_0"}
 
 
 def test_preset_sweep_smoke_with_overrides(tmp_path: Path) -> None:
@@ -434,10 +527,10 @@ def test_benchmark_release_smoke(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-release"
     release = create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=False,
     )
-    assert release["manifest"]["preset_name"] == "paper_v1_default"
+    assert release["manifest"]["preset_name"] == "paper_v1_fast"
     assert (release_dir / "release_manifest.json").exists()
     assert (release_dir / "release_protocol.json").exists()
     assert (release_dir / "final_results.csv").exists()
@@ -449,7 +542,7 @@ def test_release_hard_slice_outputs(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-release-hard"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
         hard_slice_name="cefalu_hard_v1",
     )
@@ -463,7 +556,7 @@ def test_results_memo_creation(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-release-memo"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     memo = (release_dir / "results_memo.md").read_text(encoding="utf-8")
@@ -481,7 +574,7 @@ def test_cli_release_smoke(tmp_path: Path) -> None:
             "experiments",
             "release",
             "--preset",
-            "paper_v1_default",
+            "paper_v1_fast",
             "--out",
             str(release_dir),
             "--include-hard-slice",
@@ -496,7 +589,7 @@ def test_release_validation_smoke(tmp_path: Path) -> None:
     release_dir = tmp_path / "validated-release"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     report = validate_benchmark_release(release_dir)
@@ -509,7 +602,7 @@ def test_release_validation_missing_file_failure(tmp_path: Path) -> None:
     release_dir = tmp_path / "broken-release"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=False,
     )
     (release_dir / "final_results.csv").unlink()
@@ -537,7 +630,7 @@ def test_cli_validate_release_smoke(tmp_path: Path) -> None:
     release_dir = tmp_path / "cli-validated-release"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=False,
     )
     runner = CliRunner()
@@ -560,7 +653,7 @@ def test_paper_assets_build_smoke(tmp_path: Path) -> None:
     paper_dir = tmp_path / "paper"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     built = build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
@@ -575,7 +668,7 @@ def test_paper_table_files_are_generated(tmp_path: Path) -> None:
     paper_dir = tmp_path / "paper"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=False,
     )
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
@@ -591,7 +684,7 @@ def test_paper_figure_files_are_generated(tmp_path: Path) -> None:
     paper_dir = tmp_path / "paper"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
@@ -604,7 +697,7 @@ def test_manuscript_scaffold_content(tmp_path: Path) -> None:
     paper_dir = tmp_path / "paper"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
@@ -620,7 +713,7 @@ def test_cli_build_paper_assets_smoke(tmp_path: Path) -> None:
     paper_dir = tmp_path / "paper"
     create_benchmark_release(
         out_dir=release_dir,
-        preset_name="paper_v1_default",
+        preset_name="paper_v1_fast",
         include_hard_slice=True,
     )
     runner = CliRunner()
@@ -643,7 +736,7 @@ def test_cli_build_paper_assets_smoke(tmp_path: Path) -> None:
 def test_validate_paper_assets_smoke(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-validation-release"
     paper_dir = tmp_path / "paper"
-    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_default", include_hard_slice=True)
+    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
     report = validate_paper_assets(release_dir=release_dir, paper_dir=paper_dir)
     assert report["passed"] is True
@@ -654,7 +747,7 @@ def test_validate_paper_assets_smoke(tmp_path: Path) -> None:
 def test_validate_paper_assets_missing_file_failure(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-validation-broken-release"
     paper_dir = tmp_path / "paper"
-    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_default", include_hard_slice=True)
+    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
     (paper_dir / "assets" / "core_results_table.csv").unlink()
     report = validate_paper_assets(release_dir=release_dir, paper_dir=paper_dir)
@@ -665,7 +758,7 @@ def test_validate_paper_assets_missing_file_failure(tmp_path: Path) -> None:
 def test_validate_paper_assets_table_consistency_failure(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-validation-table-release"
     paper_dir = tmp_path / "paper"
-    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_default", include_hard_slice=True)
+    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
     frame = pd.read_csv(paper_dir / "assets" / "core_results_table.csv")
     frame.loc[0, "validation_score_mean"] = frame.loc[0, "validation_score_mean"] + 1.0
@@ -678,11 +771,16 @@ def test_validate_paper_assets_table_consistency_failure(tmp_path: Path) -> None
 def test_validate_paper_assets_finding_consistency_failure(tmp_path: Path) -> None:
     release_dir = tmp_path / "paper-validation-finding-release"
     paper_dir = tmp_path / "paper"
-    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_default", include_hard_slice=True)
+    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
+    release_robustness = pd.read_csv(release_dir / "final_robustness.csv")
+    hardest_core_case = str(
+        release_robustness.loc[release_robustness["absolute_score_gap_mean"].idxmin(), "benchmark_case"]
+    )
     results_notes_path = paper_dir / "results_notes.md"
     results_notes = results_notes_path.read_text(encoding="utf-8")
-    results_notes_path.write_text(results_notes.replace("cefalu_lambda_1_0", "fermat_quartic", 1), encoding="utf-8")
+    replacement = "fermat_quartic" if hardest_core_case != "fermat_quartic" else "cefalu_lambda_0_75"
+    results_notes_path.write_text(results_notes.replace(hardest_core_case, replacement, 1), encoding="utf-8")
     report = validate_paper_assets(release_dir=release_dir, paper_dir=paper_dir)
     assert report["passed"] is False
     assert any("hardest core case" in failure for failure in report["failures"])
@@ -691,7 +789,7 @@ def test_validate_paper_assets_finding_consistency_failure(tmp_path: Path) -> No
 def test_cli_validate_paper_assets_smoke(tmp_path: Path) -> None:
     release_dir = tmp_path / "cli-paper-validation-release"
     paper_dir = tmp_path / "paper"
-    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_default", include_hard_slice=True)
+    create_benchmark_release(out_dir=release_dir, preset_name="paper_v1_fast", include_hard_slice=True)
     build_paper_assets(input_dir=release_dir, out_dir=paper_dir)
     runner = CliRunner()
     result = runner.invoke(

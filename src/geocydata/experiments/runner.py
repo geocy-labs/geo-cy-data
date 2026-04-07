@@ -147,6 +147,7 @@ def run_experiment(
 
     dataset = load_bundle_dataset(bundle_dir)
     matrix = prepare_experiment_matrix(dataset, model_name=model_name, target_name=target_name)
+    resolved_case_id = benchmark_case_id or dataset.manifest.get("case_id")
     output_dir = ensure_directory(out_dir)
     config = {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -162,7 +163,7 @@ def run_experiment(
         "test_size": test_size,
         "split_strategy": "deterministic_random_train_validation_split",
         "split_seed": seed,
-        "benchmark_case_id": benchmark_case_id,
+        "benchmark_case_id": resolved_case_id,
         "target_name": matrix.target_name,
         "target_description": TARGET_LABELS[matrix.target_name],
         "target_status": TARGET_METADATA[matrix.target_name]["status"],
@@ -190,7 +191,7 @@ def run_experiment(
         dataset=dataset,
         target_name=matrix.target_name,
         split_seed=seed,
-        benchmark_case_id=benchmark_case_id,
+        benchmark_case_id=resolved_case_id,
         feature_dim=matrix.X.shape[1],
         n_samples=matrix.X.shape[0],
         runtime_seconds=runtime_seconds,
@@ -211,7 +212,7 @@ def run_experiment(
         "protocol_version": "phase9",
         "bundle_path": str(dataset.bundle_dir),
         "run_path": str(output_dir),
-        "benchmark_case_id": benchmark_case_id,
+        "benchmark_case_id": resolved_case_id,
         "geometry": metrics["geometry"],
         "lambda": metrics["lambda"],
         "target_name": metrics["target_name"],
@@ -259,6 +260,7 @@ def compare_experiments(
     """Run local and global experiment modes and write a comparison summary."""
 
     output_dir = ensure_directory(out_dir)
+    dataset = load_bundle_dataset(bundle_dir)
     local_metrics = run_experiment(
         bundle_dir=bundle_dir,
         model_name="local",
@@ -266,7 +268,7 @@ def compare_experiments(
         out_dir=output_dir / "local",
         seed=seed,
         test_size=test_size,
-        benchmark_case_id=None,
+        benchmark_case_id=dataset.manifest.get("case_id"),
     )
     global_metrics = run_experiment(
         bundle_dir=bundle_dir,
@@ -275,12 +277,11 @@ def compare_experiments(
         out_dir=output_dir / "global",
         seed=seed,
         test_size=test_size,
-        benchmark_case_id=None,
+        benchmark_case_id=dataset.manifest.get("case_id"),
     )
-    dataset = load_bundle_dataset(bundle_dir)
     comparison = {
         "bundle": str(Path(bundle_dir)),
-        "benchmark_case_id": None,
+        "benchmark_case_id": dataset.manifest.get("case_id"),
         "geometry": dataset.manifest.get("geometry"),
         "lambda": dict(dataset.manifest.get("parameters", {})).get("lambda"),
         "target_name": local_metrics["target_name"],

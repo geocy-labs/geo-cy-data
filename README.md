@@ -10,6 +10,8 @@ Research workflows around Calabi-Yau benchmark data often start as one-off scrip
 
 - Reproducible bundle generation for the Fermat quartic benchmark in `P^3`
 - Parameterized bundle generation for the Cefalu quartic family in `P^3`
+- First-class Paper 1 / GlobalCY Cefalu cases at `lambda = 0.0, 0.75, 1.0, 1.5, 3.0`
+- Fixed near-singular Cefalu slice presets around `lambda = 0.75` and `lambda = 1.0`
 - Symmetry-orbit generation and canonical representatives for the Cefalu quartic family
 - Lightweight experiment runner for local-vs-global representation comparison
 - Geometry-derived experiment targets, with `hypersurface_fs_scalar` as the preferred hypersurface-aware benchmark target
@@ -53,12 +55,18 @@ geocydata generate bundle --geometry fermat_quartic --n 2000 --seed 7 --out outp
 Parameterized Cefalu examples:
 
 ```bash
+geocydata generate bundle --geometry cefalu_quartic --lambda 0.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_0
 geocydata generate bundle --geometry cefalu_quartic --lambda 0.75 --n 2000 --seed 7 --out outputs/cefalu_lambda_0_75
 geocydata generate bundle --geometry cefalu_quartic --lambda 1.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_1_0
+geocydata generate bundle --geometry cefalu_quartic --lambda 1.5 --n 2000 --seed 7 --out outputs/cefalu_lambda_1_5
+geocydata generate bundle --geometry cefalu_quartic --lambda 3.0 --n 2000 --seed 7 --out outputs/cefalu_lambda_3_0
 geocydata generate orbits --geometry cefalu_quartic --lambda 1.0 --n 200 --seed 7 --out outputs/cefalu_orbits
 geocydata experiments compare --bundle outputs/cefalu_lambda_1_0 --target hypersurface_fs_scalar --out runs/compare_hfs
 geocydata experiments sweep --out runs/phase8_sweep --target hypersurface_fs_scalar --seeds 7 11 19
 geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
+geocydata experiments sweep --preset globalcy_paper1_core --out runs/globalcy_paper1_core
+geocydata experiments sweep --preset globalcy_paper1_near_0_75 --out runs/globalcy_near_0_75
+geocydata experiments sweep --preset globalcy_paper1_near_1_0 --out runs/globalcy_near_1_0
 geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
 geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
 geocydata experiments validate-release --input releases/paper_v1_release
@@ -71,10 +79,23 @@ geocydata experiments validate-paper-assets --release releases/paper_v1_release 
 ```text
 outputs/demo/
   manifest.json
+  case_metadata.json
   points.parquet
   invariants.parquet
+  sample_weights.parquet
   validation_report.json
+  evaluation_summary.json
   summary.md
+```
+
+For `cefalu_quartic`, the model-ready direct bundle export also writes:
+
+```text
+outputs/cefalu_lambda_1_0/
+  canonical_representatives.parquet
+  canonical_invariants.parquet
+  orbits.parquet
+  symmetry_report.json
 ```
 
 The output directory name is user-chosen. `outputs/demo` is only an example; any empty or existing directory path is valid.
@@ -108,6 +129,21 @@ geocydata experiments run --bundle outputs/cefalu_lambda_1_0 --model global --ta
 
 - `fermat_quartic`: Fermat quartic hypersurface in `P^3`
 - `cefalu_quartic`: parameterized quartic family with required `--lambda`
+
+## Paper 1 / GlobalCY cases
+
+The current first-class Paper 1 Cefalu cases are:
+
+- `cefalu_lambda_0_0`
+- `cefalu_lambda_0_75`
+- `cefalu_lambda_1_0`
+- `cefalu_lambda_1_5`
+- `cefalu_lambda_3_0`
+
+Fixed near-singular slices are also available through protocol presets:
+
+- `globalcy_paper1_near_0_75`: `0.74, 0.75, 0.76`
+- `globalcy_paper1_near_1_0`: `0.99, 1.0, 1.01`
 
 ## Documentation
 

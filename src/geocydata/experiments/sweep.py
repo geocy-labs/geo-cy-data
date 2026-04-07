@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,70 +24,14 @@ from geocydata.experiments.reporting import (
 from geocydata.experiments.runner import run_experiment
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
+from geocydata.registry.cases import GEOMETRY_CASES, GeometryCase
 from geocydata.registry.geometries import get_geometry
 from geocydata.sampling.point_sampler import generate_sample_batch
 from geocydata.utils.paths import ensure_directory
 from geocydata.validation.reports import build_validation_report
 
 
-@dataclass(frozen=True)
-class BenchmarkCase:
-    """One benchmark case in the standardized sweep matrix."""
-
-    case_id: str
-    geometry: str
-    parameters: dict[str, object]
-    label: str
-
-    def metadata(self) -> dict[str, object]:
-        """Return a JSON-serializable case definition."""
-
-        return {
-            "case_id": self.case_id,
-            "geometry": self.geometry,
-            "parameters": self.parameters,
-            "label": self.label,
-        }
-
-
-BENCHMARK_CASES: tuple[BenchmarkCase, ...] = (
-    BenchmarkCase(
-        case_id="fermat_quartic",
-        geometry="fermat_quartic",
-        parameters={},
-        label="Fermat quartic",
-    ),
-    BenchmarkCase(
-        case_id="cefalu_lambda_0_75",
-        geometry="cefalu_quartic",
-        parameters={"lambda": 0.75},
-        label="Cefalu quartic (lambda=0.75)",
-    ),
-    BenchmarkCase(
-        case_id="cefalu_lambda_1_0",
-        geometry="cefalu_quartic",
-        parameters={"lambda": 1.0},
-        label="Cefalu quartic (lambda=1.0)",
-    ),
-    BenchmarkCase(
-        case_id="cefalu_lambda_0_99",
-        geometry="cefalu_quartic",
-        parameters={"lambda": 0.99},
-        label="Cefalu quartic (lambda=0.99)",
-    ),
-    BenchmarkCase(
-        case_id="cefalu_lambda_1_00",
-        geometry="cefalu_quartic",
-        parameters={"lambda": 1.0},
-        label="Cefalu quartic (lambda=1.00)",
-    ),
-    BenchmarkCase(
-        case_id="cefalu_lambda_1_01",
-        geometry="cefalu_quartic",
-        parameters={"lambda": 1.01},
-        label="Cefalu quartic (lambda=1.01)",
-    ),
-)
+BENCHMARK_CASES: tuple[GeometryCase, ...] = GEOMETRY_CASES
 
 
 def _bundle_summary_markdown(
@@ -139,7 +82,7 @@ def _bundle_summary_markdown(
 """
 
 
-def _resolve_cases(include: list[str] | None) -> list[BenchmarkCase]:
+def _resolve_cases(include: list[str] | None) -> list[GeometryCase]:
     if not include:
         return list(BENCHMARK_CASES)
 
@@ -154,7 +97,7 @@ def _resolve_cases(include: list[str] | None) -> list[BenchmarkCase]:
 def _bundle_matches_request(
     manifest: dict[str, object],
     *,
-    case: BenchmarkCase,
+    case: GeometryCase,
     n: int,
     seed: int,
 ) -> bool:
@@ -171,7 +114,7 @@ def _bundle_matches_request(
 
 def ensure_benchmark_bundle(
     *,
-    case: BenchmarkCase,
+    case: GeometryCase,
     bundle_dir: Path,
     n: int,
     seed: int,
@@ -196,6 +139,7 @@ def ensure_benchmark_bundle(
         n=n,
         seed=seed,
         parameters=case.parameters,
+        include_symmetry_exports=False,
     )
     report = build_validation_report(
         batch.points,
@@ -203,6 +147,7 @@ def ensure_benchmark_bundle(
         parameters=case.parameters,
         n_points=n,
         seed=seed,
+        points_df=batch.points_df,
     )
     artifact_paths = {
         "manifest": "manifest.json",
@@ -217,7 +162,7 @@ def ensure_benchmark_bundle(
     summary_path.write_text(
         _bundle_summary_markdown(
             geometry_name=case.geometry,
-            parameters=case.parameters,
+            parameters={**case.parameters, "case_id": case.case_id},
             n_points=n,
             artifact_paths=artifact_paths,
             report=report,
@@ -234,8 +179,15 @@ def ensure_benchmark_bundle(
             "geometry": case.geometry,
             "geometry_description": geometry.description,
             **case.parameters,
+            "case_id": case.case_id,
             "n": n,
             "seed": seed,
+        },
+        case_id=case.case_id,
+        protocol_metadata={
+            "export_profile": "benchmark_sweep_internal",
+            "case_label": case.label,
+            "paper1_core_case": case.case_id in {"fermat_quartic", "cefalu_lambda_0_0", "cefalu_lambda_0_75", "cefalu_lambda_1_0", "cefalu_lambda_1_5", "cefalu_lambda_3_0"},
         },
     )
     write_manifest(manifest, manifest_path)
@@ -244,7 +196,7 @@ def ensure_benchmark_bundle(
 
 def _write_case_manifest(
     *,
-    case: BenchmarkCase,
+    case: GeometryCase,
     target_name: str,
     seed: int,
     n: int,

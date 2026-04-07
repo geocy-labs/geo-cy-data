@@ -6,6 +6,9 @@ One row per sampled point with:
 
 - `point_id`
 - `chart_id`
+- `geometry`
+- `case_id`
+- `seed`
 - `z{0..3}_re`, `z{0..3}_im`: normalized homogeneous coordinates
 - `affine_{0..2}_re`, `affine_{0..2}_im`: affine coordinates in the chosen chart
 - `family_lambda` when the geometry is `cefalu_quartic`
@@ -19,6 +22,9 @@ One row per sampled point with:
 - `point_id`
 - `m_{i}_{j}_re`
 - `m_{i}_{j}_im`
+- `geometry`
+- `case_id`
+- `seed`
 - `family_lambda` when the geometry is `cefalu_quartic`
 
 These values come from the normalized Hermitian outer product
@@ -27,23 +33,86 @@ These values come from the normalized Hermitian outer product
 
 which is invariant under nonzero complex projective rescaling.
 
+## `sample_weights.parquet`
+
+One row per sampled point with:
+
+- `point_id`
+- `geometry`
+- `case_id`
+- `seed`
+- `uniform_weight`
+- `chart_balance_weight`
+- `symmetry_orbit_weight`
+- `combined_weight`
+- `family_lambda` when the geometry is `cefalu_quartic`
+
+These weights are intended as model-facing helpers for downstream GlobalCY experiments. They do not change the base bundle geometry; they package reproducible weighting metadata with the sampled points.
+
 ## `manifest.json`
 
-Includes application metadata, generation parameters, artifact paths, schema version, and bundle naming fields such as `bundle_name` and `bundle_path`. For the Cefalu family, `parameters.lambda` stores the selected family value.
+Includes application metadata, generation parameters, artifact paths, schema version, bundle naming fields such as `bundle_name` and `bundle_path`, top-level `case_id`, and optional `protocol_metadata`. For the Cefalu family, `parameters.lambda` stores the selected family value.
+
+## `case_metadata.json`
+
+Produced by direct `geocydata generate bundle` exports.
+
+- `case_id`
+- `geometry`
+- `lambda` when present
+- `seed`
+- `n`
+
+## `evaluation_summary.json`
+
+Produced by direct `geocydata generate bundle` exports.
+
+Includes geometry-aware export hooks:
+
+- `chart_consistency`
+- `projective_invariance_drift`
+- `symmetry_consistency` for `cefalu_quartic`
+- `positivity_eigenvalue_summary`
+- `characteristic_form_euler_summary`
+
+These are lightweight downstream evaluation hooks, not final geometric proofs.
+
+## `canonical_representatives.parquet`
+
+Produced by direct `geocydata generate bundle` for `cefalu_quartic`.
+
+- one row per base sampled point
+- deterministic canonical representative coordinates
+- `canonical_key`
+- `orbit_size`
+- `geometry`
+- `case_id`
+- `seed`
+
+## `canonical_invariants.parquet`
+
+Produced by direct `geocydata generate bundle` for `cefalu_quartic`.
+
+- canonical representative invariant features
+- `geometry`
+- `case_id`
+- `seed`
+- `family_lambda`
 
 ## `orbits.parquet`
 
-Produced by `geocydata generate orbits` for `cefalu_quartic`.
+Produced by direct `geocydata generate bundle` and by `geocydata generate orbits` for `cefalu_quartic`.
 
 - `point_id`: base sampled point id
-- `action_id`: symmetry action label
-- `permutation`: JSON-encoded coordinate permutation
-- `signs`: JSON-encoded sign pattern
 - `canonical_key`: deterministic orbit representative label
-- `is_canonical`: whether this row is the chosen canonical representative
 - `orbit_size`: number of unique representatives recorded for the base point
-- `z{0..3}_re`, `z{0..3}_im`: phase-normalized representative coordinates
+- `group_size`: size of the signed-permutation action set
+- `geometry`
+- `case_id`
+- `seed`
 - `family_lambda`: Cefalu family parameter
+
+The direct bundle export writes a lightweight orbit-metadata table. The dedicated `generate orbits` command writes the fuller orbit expansion table for symmetry-focused workflows.
 
 ## `validation_report.json`
 

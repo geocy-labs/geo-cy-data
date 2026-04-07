@@ -44,6 +44,29 @@ Arguments:
 
 On success, the command prints the output path and the artifact filenames written into that directory.
 
+For Paper 1 / GlobalCY use, the fixed first-class Cefalu cases are:
+
+- `--lambda 0.0`
+- `--lambda 0.75`
+- `--lambda 1.0`
+- `--lambda 1.5`
+- `--lambda 3.0`
+
+Direct model-ready bundles include:
+
+- local chart coordinates in `points.parquet`
+- projective invariants in `invariants.parquet`
+- `sample_weights.parquet`
+- `case_metadata.json`
+- `evaluation_summary.json`
+
+For direct `cefalu_quartic` bundles, they also include:
+
+- `canonical_representatives.parquet`
+- `canonical_invariants.parquet`
+- `orbits.parquet` with lightweight orbit metadata
+- `symmetry_report.json`
+
 ## Generate symmetry orbits
 
 ```bash
@@ -109,6 +132,12 @@ Default Phase 6 cases:
 - `fermat_quartic`
 - `cefalu_lambda_0_75`
 - `cefalu_lambda_1_0`
+
+Additional Paper 1 presets:
+
+- `globalcy_paper1_core`: `fermat_quartic`, `cefalu_lambda_0_0`, `cefalu_lambda_0_75`, `cefalu_lambda_1_0`, `cefalu_lambda_1_5`, `cefalu_lambda_3_0`
+- `globalcy_paper1_near_0_75`: `cefalu_lambda_0_74`, `cefalu_lambda_0_75`, `cefalu_lambda_0_76`
+- `globalcy_paper1_near_1_0`: `cefalu_lambda_0_99`, `cefalu_lambda_1_0`, `cefalu_lambda_1_01`
 
 Useful flags:
 
