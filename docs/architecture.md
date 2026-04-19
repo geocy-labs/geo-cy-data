@@ -68,6 +68,7 @@ Phase 9 adds a thin paper-style protocol layer:
 
 - `geocydata.experiments.protocols`: named presets that freeze benchmark cases, targets, seeds, and sample counts
 - `geocydata.experiments.sweep`: preset resolution with explicit flag overrides
+- `cefalu_hard_regime_sweep_v1`: a Paper II / GlobalCY II hard-regime Cefalu preset with a machine-readable preset manifest for downstream model consumption
 - `geocydata.experiments.reporting`: robustness tables and compact paper-style outputs derived from the standardized sweep results
 
 Phase 10 adds a release-packaging layer:
@@ -93,4 +94,9 @@ Phase 12B adds a downstream consistency validator:
 - this validator is intentionally lightweight and structural; it does not introduce a separate manuscript data model
 
 The sweep intentionally reuses the existing bundle generator and experiment runner. It standardizes metadata and reporting without introducing a separate training stack or a second experiment format.
+
+For GlobalCY integration, the preferred handoff is now:
+
+- `benchmark_preset_manifest.json` for the preset-level contract
+- `bundles/<case_id>/seed_<seed>/manifest.json` for per-bundle artifact paths and available model-facing views
 

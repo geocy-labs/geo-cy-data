@@ -23,6 +23,7 @@ def build_benchmark_manifest(
     test_size: float,
     cases: list[dict[str, object]],
     result_count: int,
+    benchmark_version: str,
     protocol: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build standardized metadata for one benchmark sweep."""
@@ -32,6 +33,7 @@ def build_benchmark_manifest(
         "app_version": __version__,
         "schema_version": "0.1",
         "protocol_version": "phase9",
+        "benchmark_version": benchmark_version,
         "benchmark_name": output_dir.name,
         "benchmark_path": str(output_dir),
         "target": target_name,
@@ -49,6 +51,7 @@ def build_benchmark_manifest(
         "artifacts": {
             "benchmark_protocol": "benchmark_protocol.json",
             "benchmark_manifest": "benchmark_manifest.json",
+            "benchmark_preset_manifest": "benchmark_preset_manifest.json",
             "benchmark_results_csv": "benchmark_results.csv",
             "benchmark_results_json": "benchmark_results.json",
             "benchmark_summary": "benchmark_summary.md",

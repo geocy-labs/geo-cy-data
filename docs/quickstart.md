@@ -59,6 +59,7 @@ geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
 geocydata experiments sweep --preset globalcy_paper1_core --out runs/globalcy_paper1_core
 geocydata experiments sweep --preset globalcy_paper1_near_0_75 --out runs/globalcy_near_0_75
 geocydata experiments sweep --preset globalcy_paper1_near_1_0 --out runs/globalcy_near_1_0
+geocydata experiments sweep --preset cefalu_hard_regime_sweep_v1 --out runs/cefalu_hard_regime_v1
 geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
 geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
 geocydata experiments validate-release --input releases/paper_v1_release
@@ -110,6 +111,7 @@ Each sweep case/seed combination writes:
 Phase 9 also adds:
 
 - `benchmark_protocol.json`: resolved preset plus any explicit overrides
+- `benchmark_preset_manifest.json`: preset-level contract for downstream consumers such as GlobalCY
 - `benchmark_robustness.csv` and `benchmark_robustness.json`: case-level robustness comparisons between local and global
 - `benchmark_robustness_summary.md`: paper-style narrative summary of score gaps and seed robustness
 - `paper_table.csv`: compact table suitable for later paper/report integration

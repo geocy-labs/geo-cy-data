@@ -61,6 +61,7 @@ def test_protocol_preset_resolution() -> None:
     assert "paper_v1_multiseed" in PROTOCOL_PRESETS
     assert "globalcy_paper1_core" in PROTOCOL_PRESETS
     assert "globalcy_paper1_near_0_75" in PROTOCOL_PRESETS
+    assert "cefalu_hard_regime_sweep_v1" in PROTOCOL_PRESETS
     assert "globalcy_near_lambda_1_0" in HARD_EVALUATION_SLICES
 
 
@@ -76,12 +77,27 @@ def test_globalcy_paper1_core_preset_cases() -> None:
     )
 
 
+def test_paper2_hard_regime_preset_cases() -> None:
+    preset = resolve_protocol_preset("cefalu_hard_regime_sweep_v1")
+    assert preset.include == (
+        "cefalu_lambda_0_50",
+        "cefalu_lambda_0_75",
+        "cefalu_lambda_0_90",
+        "cefalu_lambda_1_0",
+        "cefalu_lambda_1_10",
+    )
+    assert preset.benchmark_version == "paper2_hard_regime_v1"
+
+
 def test_cefalu_case_id_canonicalization() -> None:
     assert canonicalize_cefalu_lambda_case_id(0.75) == "cefalu_lambda_0_75"
     assert canonicalize_cefalu_lambda_case_id(1.0) == "cefalu_lambda_1_0"
     assert canonicalize_cefalu_lambda_case_id(1.5) == "cefalu_lambda_1_5"
     assert canonicalize_cefalu_lambda_case_id(3.0) == "cefalu_lambda_3_0"
     assert derive_case_id("cefalu_quartic", {"lambda": 1.0}) == "cefalu_lambda_1_0"
+    assert derive_case_id("cefalu_quartic", {"lambda": 0.5}) == "cefalu_lambda_0_50"
+    assert derive_case_id("cefalu_quartic", {"lambda": 0.9}) == "cefalu_lambda_0_90"
+    assert derive_case_id("cefalu_quartic", {"lambda": 1.1}) == "cefalu_lambda_1_10"
 
 
 def test_geometry_target_computation_smoke(tmp_path: Path) -> None:
@@ -339,6 +355,38 @@ def test_preset_sweep_smoke_with_overrides(tmp_path: Path) -> None:
     assert protocol["preset_name"] == "paper_v1_default"
     assert protocol["resolved"]["include"] == ["fermat_quartic"]
     assert protocol["resolved"]["n_samples"] == 24
+
+
+def test_paper2_hard_regime_sweep_bundle_exports_and_manifest(tmp_path: Path) -> None:
+    sweep_dir = tmp_path / "paper2-hard-regime"
+    result = sweep_experiments(
+        out_dir=sweep_dir,
+        preset_name="cefalu_hard_regime_sweep_v1",
+        seeds=[7],
+        n=24,
+        include=["cefalu_lambda_0_50"],
+    )
+    bundle_dir = sweep_dir / "bundles" / "cefalu_lambda_0_50" / "seed_7"
+    assert (bundle_dir / "points.parquet").exists()
+    assert (bundle_dir / "invariants.parquet").exists()
+    assert (bundle_dir / "sample_weights.parquet").exists()
+    assert (bundle_dir / "case_metadata.json").exists()
+    assert (bundle_dir / "evaluation_summary.json").exists()
+    assert (bundle_dir / "canonical_representatives.parquet").exists()
+    assert (bundle_dir / "canonical_invariants.parquet").exists()
+    assert (bundle_dir / "orbits.parquet").exists()
+    assert (bundle_dir / "symmetry_report.json").exists()
+    bundle_manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert bundle_manifest["protocol_metadata"]["export_profile"] == "benchmark_sweep_model_ready"
+    assert "symmetry_orbit_metadata" in bundle_manifest["protocol_metadata"]["available_model_facing_views"]
+
+    preset_manifest = json.loads((sweep_dir / "benchmark_preset_manifest.json").read_text(encoding="utf-8"))
+    assert preset_manifest["benchmark_version"] == "paper2_hard_regime_v1"
+    assert preset_manifest["cases"][0]["case_id"] == "cefalu_lambda_0_50"
+    assert preset_manifest["cases"][0]["lambda_value"] == 0.5
+    assert preset_manifest["cases"][0]["geometry_family"] == "cefalu_quartic"
+    assert "available_model_facing_views" in preset_manifest["cases"][0]
+    assert result["manifest"]["benchmark_version"] == "paper2_hard_regime_v1"
 
 
 def test_run_bookkeeping_records_split_and_case_metadata(tmp_path: Path) -> None:

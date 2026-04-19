@@ -24,7 +24,7 @@ from geocydata.experiments.reporting import (
 from geocydata.experiments.runner import run_experiment
 from geocydata.export.manifest import build_manifest, write_manifest
 from geocydata.export.parquet_io import write_parquet
-from geocydata.registry.cases import GEOMETRY_CASES, GeometryCase
+from geocydata.registry.cases import GEOMETRY_CASES, GeometryCase, build_benchmark_case_entry, model_facing_views_for_case
 from geocydata.registry.geometries import get_geometry
 from geocydata.sampling.point_sampler import generate_sample_batch
 from geocydata.utils.paths import ensure_directory
@@ -125,9 +125,21 @@ def ensure_benchmark_bundle(
     manifest_path = output_dir / "manifest.json"
     points_path = output_dir / "points.parquet"
     invariants_path = output_dir / "invariants.parquet"
+    sample_weights_path = output_dir / "sample_weights.parquet"
+    case_metadata_path = output_dir / "case_metadata.json"
     report_path = output_dir / "validation_report.json"
+    evaluation_summary_path = output_dir / "evaluation_summary.json"
     summary_path = output_dir / "summary.md"
-    required = (manifest_path, points_path, invariants_path, report_path, summary_path)
+    required = (
+        manifest_path,
+        points_path,
+        invariants_path,
+        sample_weights_path,
+        case_metadata_path,
+        report_path,
+        evaluation_summary_path,
+        summary_path,
+    )
     if all(path.exists() for path in required):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if _bundle_matches_request(manifest, case=case, n=n, seed=seed):
@@ -139,7 +151,7 @@ def ensure_benchmark_bundle(
         n=n,
         seed=seed,
         parameters=case.parameters,
-        include_symmetry_exports=False,
+        include_symmetry_exports=case.geometry == "cefalu_quartic",
     )
     report = build_validation_report(
         batch.points,
@@ -151,14 +163,54 @@ def ensure_benchmark_bundle(
     )
     artifact_paths = {
         "manifest": "manifest.json",
+        "case_metadata": "case_metadata.json",
         "points": "points.parquet",
         "invariants": "invariants.parquet",
+        "sample_weights": "sample_weights.parquet",
         "validation_report": "validation_report.json",
+        "evaluation_summary": "evaluation_summary.json",
         "summary": "summary.md",
     }
+    if batch.canonical_representatives_df is not None:
+        artifact_paths["canonical_representatives"] = "canonical_representatives.parquet"
+    if batch.canonical_invariants_df is not None:
+        artifact_paths["canonical_invariants"] = "canonical_invariants.parquet"
+    if batch.orbits_df is not None:
+        artifact_paths["orbits"] = "orbits.parquet"
+        artifact_paths["symmetry_report"] = "symmetry_report.json"
     write_parquet(batch.points_df, points_path)
     write_parquet(batch.invariants_df, invariants_path)
+    write_parquet(batch.sample_weights_df, sample_weights_path)
+    if batch.canonical_representatives_df is not None:
+        write_parquet(batch.canonical_representatives_df, output_dir / artifact_paths["canonical_representatives"])
+    if batch.canonical_invariants_df is not None:
+        write_parquet(batch.canonical_invariants_df, output_dir / artifact_paths["canonical_invariants"])
+    if batch.orbits_df is not None:
+        write_parquet(batch.orbits_df, output_dir / artifact_paths["orbits"])
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    evaluation_summary_path.write_text(
+        json.dumps(report.get("geometry_evaluation_hooks", {}), indent=2),
+        encoding="utf-8",
+    )
+    case_metadata_path.write_text(
+        json.dumps(
+            {
+                "case_id": case.case_id,
+                "geometry": case.geometry,
+                "lambda": case.parameters.get("lambda"),
+                "seed": seed,
+                "n": n,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    if batch.orbits_df is not None:
+        symmetry_report = report.get("geometry_evaluation_hooks", {}).get("symmetry_consistency", {})
+        (output_dir / artifact_paths["symmetry_report"]).write_text(
+            json.dumps(symmetry_report, indent=2),
+            encoding="utf-8",
+        )
     summary_path.write_text(
         _bundle_summary_markdown(
             geometry_name=case.geometry,
@@ -185,9 +237,10 @@ def ensure_benchmark_bundle(
         },
         case_id=case.case_id,
         protocol_metadata={
-            "export_profile": "benchmark_sweep_internal",
+            "export_profile": "benchmark_sweep_model_ready",
             "case_label": case.label,
             "paper1_core_case": case.case_id in {"fermat_quartic", "cefalu_lambda_0_0", "cefalu_lambda_0_75", "cefalu_lambda_1_0", "cefalu_lambda_1_5", "cefalu_lambda_3_0"},
+            "available_model_facing_views": model_facing_views_for_case(case),
         },
     )
     write_manifest(manifest, manifest_path)
@@ -223,6 +276,7 @@ def _write_case_manifest(
         "split_strategy": "deterministic_random_train_validation_split",
         "bundle_path": str(bundle_dir),
         "run_paths": model_run_dirs,
+        "available_model_facing_views": model_facing_views_for_case(case),
         "artifacts": {
             "case_manifest": "case_manifest.json",
         },
@@ -243,6 +297,7 @@ def sweep_experiments(
     """Run the standardized benchmark sweep and write per-seed plus aggregated results."""
 
     resolved_preset = resolve_protocol_preset(preset_name) if preset_name else None
+    benchmark_version = resolved_preset.benchmark_version if resolved_preset else "ad_hoc_benchmark_v1"
     resolved_target_name = target_name or (resolved_preset.target_name if resolved_preset else "hypersurface_fs_scalar")
     resolved_seeds = sorted(set(seeds or (list(resolved_preset.seeds) if resolved_preset else [7])))
     resolved_n = n if n != 200 or not resolved_preset else resolved_preset.n_samples
@@ -256,6 +311,7 @@ def sweep_experiments(
 
     benchmark_protocol = {
         "protocol_version": "phase9",
+        "benchmark_version": benchmark_version,
         "preset_name": preset_name,
         "preset": resolved_preset.metadata() if resolved_preset else None,
         "resolved": {
@@ -268,6 +324,15 @@ def sweep_experiments(
             "test_size": resolved_test_size,
             "split_strategy": "deterministic_random_train_validation_split",
         },
+    }
+    benchmark_preset_manifest = {
+        "preset_name": preset_name,
+        "benchmark_version": benchmark_version,
+        "geometry_family": "cefalu_quartic" if all(case.geometry == "cefalu_quartic" for case in cases) else "mixed",
+        "target_name": resolved_target_name,
+        "seeds": resolved_seeds,
+        "n_samples": resolved_n,
+        "cases": [build_benchmark_case_entry(case, benchmark_version=benchmark_version) for case in cases],
     }
 
     for case in cases:
@@ -336,14 +401,16 @@ def sweep_experiments(
     write_benchmark_aggregated_results(aggregated_df, output_dir=output_dir)
     write_benchmark_robustness_outputs(robustness_df, output_dir=output_dir)
     (output_dir / "benchmark_protocol.json").write_text(json.dumps(benchmark_protocol, indent=2), encoding="utf-8")
+    (output_dir / "benchmark_preset_manifest.json").write_text(json.dumps(benchmark_preset_manifest, indent=2), encoding="utf-8")
     manifest = build_benchmark_manifest(
         output_dir=output_dir,
         target_name=resolved_target_name,
         seeds=resolved_seeds,
         n_samples=resolved_n,
         test_size=resolved_test_size,
-        cases=[case.metadata() for case in cases],
+        cases=[build_benchmark_case_entry(case, benchmark_version=benchmark_version) for case in cases],
         result_count=len(results_df),
+        benchmark_version=benchmark_version,
         protocol=benchmark_protocol,
     )
     (output_dir / "benchmark_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -374,5 +441,6 @@ def sweep_experiments(
         "aggregated_results": aggregated_df,
         "robustness": robustness_df,
         "protocol": benchmark_protocol,
+        "preset_manifest": benchmark_preset_manifest,
         "out_dir": str(output_dir),
     }

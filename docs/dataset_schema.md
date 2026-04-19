@@ -53,6 +53,8 @@ These weights are intended as model-facing helpers for downstream GlobalCY exper
 
 Includes application metadata, generation parameters, artifact paths, schema version, bundle naming fields such as `bundle_name` and `bundle_path`, top-level `case_id`, and optional `protocol_metadata`. For the Cefalu family, `parameters.lambda` stores the selected family value.
 
+For benchmark-sweep-generated Cefalu bundles, `protocol_metadata.available_model_facing_views` now records the exact downstream views exposed to GlobalCY-style consumers.
+
 ## `case_metadata.json`
 
 Produced by direct `geocydata generate bundle` exports.
@@ -174,7 +176,8 @@ Produced by `geocydata experiments compare`.
 Produced by `geocydata experiments sweep`.
 
 - `benchmark_protocol.json`: resolved preset, explicit overrides, target metadata, seeds, case ids, and split strategy
-- `benchmark_manifest.json`: sweep target, seed list, benchmark cases, result count, and artifact paths
+- `benchmark_manifest.json`: sweep target, seed list, benchmark version, richer benchmark-case entries, result count, and artifact paths
+- `benchmark_preset_manifest.json`: compact machine-readable preset contract with benchmark version, case ids, lambda values, geometry family, and available model-facing views
 - `benchmark_results.csv`: one row per `(case, seed, model)` result with geometry, lambda, target, split sizes, validation metrics, runtime, bundle path, and run path
 - `benchmark_results.json`: machine-readable JSON version of the tidy result table
 - `benchmark_summary.md`: markdown summary with per-case winners and score/MSE deltas
@@ -188,6 +191,13 @@ Produced by `geocydata experiments sweep`.
 - `cases/<case_id>/seed_<seed>/case_manifest.json`: explicit case definition, target, split protocol, bundle path, and run paths
 - `bundles/`: generated or reused benchmark bundles grouped by case id and seed
 - `runs/`: per-case experiment run directories grouped by case id, seed, and model
+
+For the `cefalu_hard_regime_sweep_v1` preset, each generated bundle includes:
+
+- `points.parquet`: local chart representation
+- `invariants.parquet`: projective-invariant representation
+- `sample_weights.parquet`: sampling metadata
+- `canonical_representatives.parquet`, `canonical_invariants.parquet`, `orbits.parquet`, and `symmetry_report.json` for the Cefalu symmetry-aware view
 
 ## Benchmark release artifacts
 

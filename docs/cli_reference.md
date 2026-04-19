@@ -139,6 +139,10 @@ Additional Paper 1 presets:
 - `globalcy_paper1_near_0_75`: `cefalu_lambda_0_74`, `cefalu_lambda_0_75`, `cefalu_lambda_0_76`
 - `globalcy_paper1_near_1_0`: `cefalu_lambda_0_99`, `cefalu_lambda_1_0`, `cefalu_lambda_1_01`
 
+Paper II / GlobalCY II preset:
+
+- `cefalu_hard_regime_sweep_v1`: `cefalu_lambda_0_50`, `cefalu_lambda_0_75`, `cefalu_lambda_0_90`, `cefalu_lambda_1_0`, `cefalu_lambda_1_10`
+
 Useful flags:
 
 - `--preset`: named benchmark protocol preset such as `paper_v1_fast`, `paper_v1_default`, or `paper_v1_multiseed`
@@ -153,6 +157,7 @@ This command writes:
 
 - `benchmark_protocol.json`
 - `benchmark_manifest.json`
+- `benchmark_preset_manifest.json`
 - `benchmark_results.csv`
 - `benchmark_results.json`
 - `benchmark_summary.md`
@@ -165,6 +170,8 @@ This command writes:
 - `paper_table.csv`
 - `cases/<case_id>/seed_<seed>/case_manifest.json`
 - per-case `bundles/` and `runs/` subdirectories
+
+For `cefalu_hard_regime_sweep_v1`, the preset manifest is the handoff contract GlobalCY should read first. It records benchmark version, case ids, lambda values, geometry family, and the available model-facing bundle views.
 
 ## Create a publication-facing release
 

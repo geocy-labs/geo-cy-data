@@ -11,6 +11,7 @@ Research workflows around Calabi-Yau benchmark data often start as one-off scrip
 - Reproducible bundle generation for the Fermat quartic benchmark in `P^3`
 - Parameterized bundle generation for the Cefalu quartic family in `P^3`
 - First-class Paper 1 / GlobalCY Cefalu cases at `lambda = 0.0, 0.75, 1.0, 1.5, 3.0`
+- Paper II / GlobalCY II hard-regime Cefalu preset with canonical cases around `lambda = 0.50, 0.75, 0.90, 1.0, 1.10`
 - Fixed near-singular Cefalu slice presets around `lambda = 0.75` and `lambda = 1.0`
 - Symmetry-orbit generation and canonical representatives for the Cefalu quartic family
 - Lightweight experiment runner for local-vs-global representation comparison
@@ -67,6 +68,7 @@ geocydata experiments sweep --preset paper_v1_default --out runs/paper_v1
 geocydata experiments sweep --preset globalcy_paper1_core --out runs/globalcy_paper1_core
 geocydata experiments sweep --preset globalcy_paper1_near_0_75 --out runs/globalcy_near_0_75
 geocydata experiments sweep --preset globalcy_paper1_near_1_0 --out runs/globalcy_near_1_0
+geocydata experiments sweep --preset cefalu_hard_regime_sweep_v1 --out runs/cefalu_hard_regime_v1
 geocydata experiments release --preset paper_v1_default --out releases/paper_v1_release --include-hard-slice
 geocydata experiments regenerate-release --preset paper_v1_default --out releases/paper_v1_release_regenerated --include-hard-slice
 geocydata experiments validate-release --input releases/paper_v1_release
@@ -144,6 +146,37 @@ Fixed near-singular slices are also available through protocol presets:
 
 - `globalcy_paper1_near_0_75`: `0.74, 0.75, 0.76`
 - `globalcy_paper1_near_1_0`: `0.99, 1.0, 1.01`
+
+## Paper II / GlobalCY II hard-regime preset
+
+GeoCYData now includes a named hard-regime benchmark preset for the next GlobalCY paper:
+
+- `cefalu_hard_regime_sweep_v1`
+
+The preset targets the current preferred benchmark target, `hypersurface_fs_scalar`, across:
+
+- `cefalu_lambda_0_50`
+- `cefalu_lambda_0_75`
+- `cefalu_lambda_0_90`
+- `cefalu_lambda_1_0`
+- `cefalu_lambda_1_10`
+
+Run it with:
+
+```bash
+geocydata experiments sweep --preset cefalu_hard_regime_sweep_v1 --out runs/cefalu_hard_regime_v1
+```
+
+This sweep now emits:
+
+- model-ready benchmark bundles with local chart, invariant, sampling, and Cefalu symmetry metadata views
+- `benchmark_preset_manifest.json` with benchmark version, case ids, lambda values, geometry family, and available model-facing views
+
+GlobalCY should consume this preset by reading:
+
+- `benchmark_preset_manifest.json` to discover the benchmark contract
+- `bundles/<case_id>/seed_<seed>/manifest.json` for bundle-local artifact paths
+- `points.parquet`, `invariants.parquet`, `sample_weights.parquet`, and Cefalu symmetry exports when present
 
 ## Documentation
 

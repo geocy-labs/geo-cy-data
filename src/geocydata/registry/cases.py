@@ -29,19 +29,25 @@ class GeometryCase:
 GEOMETRY_CASES: tuple[GeometryCase, ...] = (
     GeometryCase("fermat_quartic", "fermat_quartic", {}, "Fermat quartic"),
     GeometryCase("cefalu_lambda_0_0", "cefalu_quartic", {"lambda": 0.0}, "Cefalu quartic (lambda=0.0)"),
+    GeometryCase("cefalu_lambda_0_50", "cefalu_quartic", {"lambda": 0.5}, "Cefalu quartic (lambda=0.50)"),
     GeometryCase("cefalu_lambda_0_74", "cefalu_quartic", {"lambda": 0.74}, "Cefalu quartic (lambda=0.74)"),
     GeometryCase("cefalu_lambda_0_75", "cefalu_quartic", {"lambda": 0.75}, "Cefalu quartic (lambda=0.75)"),
     GeometryCase("cefalu_lambda_0_76", "cefalu_quartic", {"lambda": 0.76}, "Cefalu quartic (lambda=0.76)"),
+    GeometryCase("cefalu_lambda_0_90", "cefalu_quartic", {"lambda": 0.9}, "Cefalu quartic (lambda=0.90)"),
     GeometryCase("cefalu_lambda_0_99", "cefalu_quartic", {"lambda": 0.99}, "Cefalu quartic (lambda=0.99)"),
     GeometryCase("cefalu_lambda_1_0", "cefalu_quartic", {"lambda": 1.0}, "Cefalu quartic (lambda=1.0)"),
     GeometryCase("cefalu_lambda_1_01", "cefalu_quartic", {"lambda": 1.01}, "Cefalu quartic (lambda=1.01)"),
+    GeometryCase("cefalu_lambda_1_10", "cefalu_quartic", {"lambda": 1.1}, "Cefalu quartic (lambda=1.10)"),
     GeometryCase("cefalu_lambda_1_5", "cefalu_quartic", {"lambda": 1.5}, "Cefalu quartic (lambda=1.5)"),
     GeometryCase("cefalu_lambda_3_0", "cefalu_quartic", {"lambda": 3.0}, "Cefalu quartic (lambda=3.0)"),
 )
 
 CASE_BY_ID = {case.case_id: case for case in GEOMETRY_CASES}
 CASE_ID_ALIASES: dict[str, str] = {
+    "cefalu_lambda_0_5": "cefalu_lambda_0_50",
+    "cefalu_lambda_0_9": "cefalu_lambda_0_90",
     "cefalu_lambda_1_00": "cefalu_lambda_1_0",
+    "cefalu_lambda_1_1": "cefalu_lambda_1_10",
 }
 
 PAPER1_CORE_CASE_IDS: tuple[str, ...] = (
@@ -51,6 +57,13 @@ PAPER1_CORE_CASE_IDS: tuple[str, ...] = (
     "cefalu_lambda_1_0",
     "cefalu_lambda_1_5",
     "cefalu_lambda_3_0",
+)
+PAPER2_HARD_REGIME_CASE_IDS: tuple[str, ...] = (
+    "cefalu_lambda_0_50",
+    "cefalu_lambda_0_75",
+    "cefalu_lambda_0_90",
+    "cefalu_lambda_1_0",
+    "cefalu_lambda_1_10",
 )
 NEAR_SINGULAR_SLICES: dict[str, tuple[str, ...]] = {
     "cefalu_near_lambda_0_75": ("cefalu_lambda_0_74", "cefalu_lambda_0_75", "cefalu_lambda_0_76"),
@@ -100,3 +113,34 @@ def derive_case_id(geometry: str, parameters: dict[str, object] | None = None) -
     if geometry == "cefalu_quartic" and "lambda" in resolved_parameters:
         return canonicalize_cefalu_lambda_case_id(float(resolved_parameters["lambda"]))
     return geometry
+
+
+def model_facing_views_for_case(case: GeometryCase) -> list[str]:
+    """Return the model-facing bundle views expected for a benchmark case."""
+
+    views = [
+        "local_chart_representation",
+        "invariant_representation",
+        "sampling_metadata",
+    ]
+    if case.geometry == "cefalu_quartic":
+        views.extend(
+            [
+                "canonical_representatives",
+                "canonical_invariants",
+                "symmetry_orbit_metadata",
+            ]
+        )
+    return views
+
+
+def build_benchmark_case_entry(case: GeometryCase, *, benchmark_version: str) -> dict[str, object]:
+    """Return richer machine-readable metadata for one benchmark case."""
+
+    return {
+        **case.metadata(),
+        "lambda_value": case.parameters.get("lambda"),
+        "geometry_family": case.geometry,
+        "benchmark_version": benchmark_version,
+        "available_model_facing_views": model_facing_views_for_case(case),
+    }

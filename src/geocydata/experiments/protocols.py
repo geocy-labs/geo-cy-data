@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from geocydata.registry.cases import NEAR_SINGULAR_SLICES, PAPER1_CORE_CASE_IDS
+from geocydata.registry.cases import NEAR_SINGULAR_SLICES, PAPER1_CORE_CASE_IDS, PAPER2_HARD_REGIME_CASE_IDS
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,7 @@ class ProtocolPreset:
     seeds: tuple[int, ...]
     n_samples: int
     include: tuple[str, ...]
+    benchmark_version: str = "phase9"
     test_size: float = 0.2
     split_strategy: str = "deterministic_random_train_validation_split"
 
@@ -30,6 +31,7 @@ class ProtocolPreset:
             "seeds": list(self.seeds),
             "n_samples": self.n_samples,
             "include": list(self.include),
+            "benchmark_version": self.benchmark_version,
             "test_size": self.test_size,
             "split_strategy": self.split_strategy,
         }
@@ -83,6 +85,15 @@ PROTOCOL_PRESETS: dict[str, ProtocolPreset] = {
         seeds=(7,),
         n_samples=200,
         include=NEAR_SINGULAR_SLICES["cefalu_near_lambda_1_0"],
+    ),
+    "cefalu_hard_regime_sweep_v1": ProtocolPreset(
+        name="cefalu_hard_regime_sweep_v1",
+        description="Paper II hard-regime Cefalu benchmark preset for GlobalCY II.",
+        target_name="hypersurface_fs_scalar",
+        seeds=(7, 11, 19),
+        n_samples=200,
+        include=PAPER2_HARD_REGIME_CASE_IDS,
+        benchmark_version="paper2_hard_regime_v1",
     ),
 }
 
